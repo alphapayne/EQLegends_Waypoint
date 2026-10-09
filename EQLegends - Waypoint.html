@@ -298,6 +298,9 @@ ol.route.still li{animation:none}
             <div><label class="f" for="ntKind">Kind</label><select id="ntKind"><option value="port">Portal, gate or ring</option><option value="evac">Succor or Evacuate</option></select></div>
             <div><label class="f" for="ntReagent">Reagent (optional)</label><input type="text" id="ntReagent" maxlength="60" placeholder="Fuligan Soulstone of Innoruuk"></div>
           </div>
+          <label class="f" for="ntLanding">Where it lands (optional)</label>
+          <input type="text" id="ntLanding" maxlength="120" placeholder="Wizard spire south of the road">
+          <div id="ntNearWrap" hidden><label class="f">Lands close to these zone lines</label><div class="reagents" id="ntNear"></div></div>
           <div class="row"><button class="btn primary" type="submit" id="portSubmit">Add teleport</button><button class="btn" type="button" id="portCancel" hidden>Cancel</button></div>
           <p class="msg" id="portMsg" role="status"></p>
         </form>
@@ -360,7 +363,7 @@ ol.route.still li{animation:none}
             <div id="mine"></div>
             <details>
               <summary>Back up or edit your additions as text</summary>
-              <p class="hint">Copy this text to keep a backup or share it with a friend, who can paste it here and save. Zones are [id, name, region, nicknames]; links are [zoneA, zoneB, "zone" | "boat" | "portal", {oneway, minLevel, note}]; teleports have spell, cls, level, dest, group and an optional reagent; notes are zone id → text; directions are "fromId&gt;toId" → text.</p>
+              <p class="hint">Copy this text to keep a backup or share it with a friend, who can paste it here and save. Zones are [id, name, region, nicknames]; links are [zoneA, zoneB, "zone" | "boat" | "portal", {oneway, minLevel, note}]; teleports have spell, cls, level, dest, group and an optional reagent; notes are zone id → text; directions are "fromId&gt;toId" → text; landing is "spell|class" → {note, near: [zone ids]}.</p>
               <textarea id="dataText" spellcheck="false" aria-label="Your additions as JSON"></textarea>
               <div class="row">
                 <button class="btn primary" id="saveData" type="button">Save text</button>
@@ -496,7 +499,7 @@ const clone=o=>JSON.parse(JSON.stringify(o));
 const DEFAULT_STATE={from:"southqeynos",to:"akanon",bind:"southqeynos",
   casters:[{who:"me",cls:"Druid",level:30},{who:"me",cls:"Wizard",level:20}],
   w:{zone:1,boat:4,port:1.5},favs:[],reagents:{}};
-const EMPTY_CUSTOM={zones:[],connections:[],teleports:[],removedTeleports:[],gate:{},notes:{},directions:{}};
+const EMPTY_CUSTOM={zones:[],connections:[],teleports:[],removedTeleports:[],gate:{},notes:{},directions:{},landing:{}};
 const reagentKey=s=>String(s||"").trim().toLowerCase();
 const NOTE_MAX=500, DIR_MAX=300;
 
@@ -524,6 +527,12 @@ function normalizeCustom(c){
       return Object.keys(opt).length?[x[0],x[1],t,opt]:[x[0],x[1],t]});
   if(Array.isArray(c.teleports))out.teleports=c.teleports.filter(t=>t&&t.spell&&CLASSES.includes(t.cls)&&typeof t.dest==="string")
     .map(t=>{const o={spell:String(t.spell).slice(0,60),cls:t.cls,level:Math.max(1,Math.min(70,+t.level||1)),dest:t.dest,group:!!t.group};if(t.reagent)o.reagent=String(t.reagent).slice(0,60);if(t.evac)o.evac=true;return o});
+  // landing: "spell|class" -> {note: where it drops you, near: [zone ids whose zone line is close to that spot]}
+  if(c.landing&&typeof c.landing==="object")Object.entries(c.landing).forEach(([k,v])=>{
+    if(!k.includes("|")||!v||typeof v!=="object")return;
+    const near=Array.isArray(v.near)?[...new Set(v.near.filter(x=>typeof x==="string"))]:[], note=String(v.note||"").trim().slice(0,120);
+    if(near.length||note)out.landing[k]={near,note};
+  });
   if(Array.isArray(c.removedTeleports))out.removedTeleports=[...new Set(c.removedTeleports.filter(k=>typeof k==="string"&&k.includes("|")))];
   if(c.gate&&typeof c.gate==="object")Object.entries(c.gate).forEach(([k,v])=>{if(CLASSES.includes(k)&&+v>0)out.gate[k]=+v});
   // notes: zoneId -> text. directions: "fromId>toId" -> where to go in fromId to reach toId.
@@ -533,7 +542,18 @@ function normalizeCustom(c){
   return out;
 }
 const hasCustom=c=>c.zones.length||c.connections.length||c.teleports.length||c.removedTeleports.length||Object.keys(c.gate).length;
-const hasAny=c=>hasCustom(c)||Object.keys(c.notes).length||Object.keys(c.directions).length;
+const hasAny=c=>hasCustom(c)||Object.keys(c.notes).length||Object.keys(c.directions).length||Object.keys(c.landing).length;
+const landingOf=t=>custom.landing[portKey(t)]||{near:[],note:""};
+function setLanding(k,patch){
+  const cur={...(custom.landing[k]||{near:[],note:""}),...patch};
+  if(cur.near.length||cur.note)custom.landing[k]=cur;else delete custom.landing[k];
+  persist("custom");
+}
+function exitsOf(z){ // zones you can walk/boat/portal to from z
+  const s=new Set();
+  data.connections.forEach(c=>{const o=c[3]||{};if(c[0]===z)s.add(c[1]);if(c[1]===z&&!o.oneway)s.add(c[0])});
+  return [...s].filter(x=>zoneName[x]).sort((a,b)=>zoneName[a].localeCompare(zoneName[b]));
+}
 const dirKey=(a,b)=>a+">"+b;
 let builtinDirs={};
 function getDir(a,b){const k=dirKey(a,b);return k in custom.directions?custom.directions[k]:(builtinDirs[k]||"")}
@@ -839,6 +859,20 @@ function findRoute(ignoreLevel=false,ignoreReagents=false){
   if(dist[state.to]===Infinity)return null;
   const steps=[];let cur=state.to;
   while(cur!==state.from){const p=prev[cur];steps.unshift({zone:cur,...p});cur=p.from}
+  // Every teleport into a zone costs the same, so pick the one that lands nearest the zone line you'll take next.
+  steps.forEach((s,i)=>{
+    if(s.kind!=="spell")return;
+    const nxt=steps[i+1];
+    s.exitTo=nxt&&["zone","boat","portal"].includes(nxt.kind)?nxt.zone:null;
+    const all=ports.filter(p=>!p.isGate&&p.dest===s.zone);
+    if(s.exitTo&&!landingOf(s.port).near.includes(s.exitTo)){
+      const near=all.filter(p=>landingOf(p).near.includes(s.exitTo))
+        .sort((a,b)=>(a.evac?1:0)-(b.evac?1:0)||(a.by==="me"?0:1)-(b.by==="me"?0:1));
+      if(near.length)s.port=near[0];
+    }
+    s.near=!!(s.exitTo&&landingOf(s.port).near.includes(s.exitTo));
+    s.alts=all.filter(p=>portKey(p)!==portKey(s.port));
+  });
   return {steps,cost:dist[state.to]};
 }
 
@@ -904,7 +938,14 @@ function renderRoute(animate=false){
     if(s.kind==="boat"){icon="≈";how=`Take the boat from ${esc(zoneName[s.from])}${lvlTag(s.o)}`}
     if(s.kind==="portal"){icon="◎";how=`Take the portal in ${esc(zoneName[s.from])}${lvlTag(s.o)}${s.o&&s.o.oneway?", one way":""}`}
     if(s.kind==="spell"){const p=s.port;icon="✦";cls+=" "+p.cls.toLowerCase();
-      how=`Cast <b>${esc(p.spell)}</b> (${esc(p.cls)} ${p.level}${p.by==="friend"?", ask your friend":""})${p.reagent?`, uses a ${esc(p.reagent)}`:""}${p.evac?". Fast to cast, but it can leave group members behind":""}`}
+      const L=landingOf(p);
+      how=`Cast <b>${esc(p.spell)}</b> (${esc(p.cls)} ${p.level}${p.by==="friend"?", ask your friend":""})${p.reagent?`, uses a ${esc(p.reagent)}`:""}${p.evac?". Fast to cast, but it can leave group members behind":""}`;
+      if(L.note||s.near)how+=`<div class="step-dir"><span>Lands</span> ${L.note?esc(L.note):""}${L.note&&s.near?", ":""}${s.near?`near the ${esc(zoneName[s.exitTo])} zone line`:""}</div>`;
+      if(s.alts.length){
+        const altTxt=s.alts.map(a=>`${esc(a.spell)} (${esc(a.cls)} ${a.level})`).join(", ");
+        how+=s.near?`<div class="step-how">Also lands here, farther from your exit: ${altTxt}</div>`
+          :`<div class="step-how">Also lands here: ${altTxt}.${s.exitTo?` <button class="step-edit" data-guide="${esc(s.zone)}">Mark which lands closest to ${esc(zoneName[s.exitTo])}</button>`:""}</div>`;
+      }}
     if(s.kind==="gate"){icon="⟲";how=`Cast <b>Gate</b> (${esc(s.port.cls)} ${s.port.level}) to return to your bind point`}
     items.push(`<li class="${cls}${last?" end":""}" style="animation-delay:${Math.min(i*30,400)}ms"><span class="node" aria-hidden="true">${last?"⚑":icon}</span><div class="step-zone">${zbtn(s.zone)}</div><div class="step-how">${how}</div>${stepExtras(s.zone,s.from,physical)}</li>`);
   });
@@ -926,11 +967,17 @@ function renderPorts(){
       if(t.mine&&t.builtin)acts+=`<button type="button" class="btn small" data-preset="${esc(k)}" title="Go back to the built-in version">Reset</button>`;
       acts+=`<button type="button" class="btn small danger" data-premove="${esc(k)}" aria-label="Remove ${esc(t.spell)}">Remove</button>`;
     }
-    return `<tr class="${on?"":"off"}"><td>${esc(t.spell)}${tag}</td><td>${esc(t.cls)}</td><td>${t.level}</td><td>${t.dest?esc(zoneName[t.dest]||t.dest)+(isFav(t.dest)?" ★":""):"Your bind point"}</td><td>${t.group?"Group":"Self only"}${t.evac?", evac":""}</td><td>${reag}</td><td class="acts">${acts}</td></tr>`}).join("");
+    return `<tr class="${on?"":"off"}"><td>${esc(t.spell)}${tag}</td><td>${esc(t.cls)}</td><td>${t.level}</td><td>${t.dest?esc(zoneName[t.dest]||t.dest)+(isFav(t.dest)?" ★":"")+landingSmall(t):"Your bind point"}</td><td>${t.group?"Group":"Self only"}${t.evac?", evac":""}</td><td>${reag}</td><td class="acts">${acts}</td></tr>`}).join("");
   const removed=custom.removedTeleports.map(k=>DEFAULT_DATA.teleports.find(t=>portKey(t)===k)).filter(Boolean);
   $("removedWrap").hidden=!removed.length;
   $("removedSummary").textContent=`Removed built-in spells (${removed.length})`;
   $("removedList").innerHTML=removed.map(t=>`<li><span>${esc(t.spell)} <small>${esc(t.cls)} ${t.level}, lands in ${esc(zoneName[t.dest]||t.dest)}</small></span><button type="button" class="btn small" data-prestore="${esc(portKey(t))}">Restore</button></li>`).join("");
+}
+
+function landingSmall(t){
+  const L=landingOf(t), near=L.near.filter(z=>zoneName[z]).map(z=>zoneName[z]);
+  const bits=[L.note,near.length?"near "+near.join(", "):""].filter(Boolean);
+  return bits.length?`<br><small>${esc(bits.join("; "))}</small>`:"";
 }
 
 // Reagents for teleports someone in your list could cast at their level.
@@ -954,10 +1001,17 @@ function fillPortForm(t){
   $("ntSpell").value=t?t.spell:"";$("ntCls").value=t?t.cls:"Wizard";$("ntLvl").value=t?t.level:24;
   $("ntGroup").value=t&&!t.group?"self":"group";$("ntKind").value=t&&t.evac?"evac":"port";
   $("ntReagent").value=t&&t.reagent?t.reagent:"";form.ntDest=t?t.dest:null;combos.ntDest.sync();
+  const L=t?landingOf(t):{near:[],note:""};$("ntLanding").value=L.note;renderNearChoices(L.near);
   $("portFormTitle").textContent=t?`Edit ${t.spell}`:"Add a teleport";
   $("portSubmit").textContent=t?"Save changes":"Add teleport";
   $("portCancel").hidden=!t;$("portForm").classList.toggle("editing",!!t);
 }
+function renderNearChoices(checked){
+  const exits=form.ntDest?exitsOf(form.ntDest):[];
+  $("ntNearWrap").hidden=!exits.length;
+  $("ntNear").innerHTML=exits.map((nb,j)=>`<label class="reagent" for="ntn_${j}"><input type="checkbox" id="ntn_${j}" value="${esc(nb)}"${checked.includes(nb)?" checked":""}><span>${esc(zoneName[nb])}</span></label>`).join("");
+}
+const nearChecked=()=>[...$("ntNear").querySelectorAll("input:checked")].map(i=>i.value);
 function removeTeleport(k){
   custom.teleports=custom.teleports.filter(t=>portKey(t)!==k);
   if(DEFAULT_DATA.teleports.some(t=>portKey(t)===k)&&!custom.removedTeleports.includes(k))custom.removedTeleports.push(k);
@@ -985,7 +1039,9 @@ function renderGuide(){
   const lands=data.teleports.filter(t=>t.dest===z);
   const dirBox=(a,b,label)=>{const id="g_"+dirKey(a,b).replace(/[^a-z0-9]/gi,"_");
     return `<label class="f" for="${id}" style="margin-top:0">${label}</label><textarea id="${id}" rows="2" maxlength="${DIR_MAX}" data-dir="${esc(dirKey(a,b))}" placeholder="Not written yet">${esc(getDir(a,b))}</textarea>`};
-  const exit=(l,a,b,label)=>`<li><div class="exit-head"><button data-guide="${esc(l.nb)}">${esc(zoneName[l.nb])}</button><small>${esc(linkMeta(l))}</small></div>${dirBox(a,b,label)}</li>`;
+  const closest=nb=>lands.filter(t=>landingOf(t).near.includes(nb)).map(t=>t.spell);
+  const exit=(l,a,b,label,showClosest)=>{const c=showClosest?closest(l.nb):[];
+    return `<li><div class="exit-head"><button data-guide="${esc(l.nb)}">${esc(zoneName[l.nb])}</button><small>${esc(linkMeta(l))}</small></div>${c.length?`<p class="hint" style="margin:0 0 6px">Closest teleport: ${esc(c.join(", "))}</p>`:""}${dirBox(a,b,label)}</li>`};
   el.innerHTML=`
    <div class="guide-head"><h3>${esc(nm)}</h3><small>${esc(zoneCont[z])}${customIds.has(z)?", added by you":""}</small></div>
    <div class="row" style="margin-top:0">
@@ -995,9 +1051,16 @@ function renderGuide(){
      <button class="btn small" data-gact="bind">Set as bind</button>
    </div>
    <div><h4>Notes</h4><textarea id="guideNote" rows="3" maxlength="${NOTE_MAX}" data-znote="${esc(z)}" aria-label="Notes about ${esc(nm)}" placeholder="Bank, bind spot, named camps, quest NPCs, anything you want to remember">${esc(zoneNote(z))}</textarea></div>
-   <div><h4>Leaving ${esc(nm)}</h4>${out.length?`<ul class="exits">${out.map(l=>exit(l,z,l.nb,`Where to go in ${esc(nm)}`)).join("")}</ul>`:`<p class="hint" style="margin:0">No exits on the map. Leave with Gate or a teleport, or add a link in Add locations.</p>`}</div>
+   <div><h4>Leaving ${esc(nm)}</h4>${out.length?`<ul class="exits">${out.map(l=>exit(l,z,l.nb,`Where to go in ${esc(nm)}`,true)).join("")}</ul>`:`<p class="hint" style="margin:0">No exits on the map. Leave with Gate or a teleport, or add a link in Add locations.</p>`}</div>
    <div><h4>Getting here</h4>${inn.length?`<ul class="exits">${inn.map(l=>exit(l,l.nb,z,`Where to go in ${esc(zoneName[l.nb])}`)).join("")}</ul>`:`<p class="hint" style="margin:0">No zone leads here. Only teleports reach it.</p>`}</div>
-   ${lands.length?`<div><h4>Teleports that land here</h4><ul class="mine">${lands.map(t=>`<li><span>${esc(t.spell)} <small>${esc(t.cls)} ${t.level}, ${t.group?"group":"self only"}${t.reagent?", uses "+esc(t.reagent):""}</small></span></li>`).join("")}</ul></div>`:""}`;
+   ${lands.length?`<div><h4>Teleports that land here</h4>
+     <p class="hint" style="margin:0 0 8px">Tick the zone lines each one lands close to. When a route leaves through one of them, Waypoint tells you to use the closest teleport.</p>
+     <ul class="exits">${lands.map((t,i)=>{const k=portKey(t),L=landingOf(t),exits=exitsOf(z);
+       return `<li><div class="exit-head"><strong>${esc(t.spell)}</strong><small>${esc(t.cls)} ${t.level}, ${t.group?"group":"self only"}${t.evac?", evac":""}${t.reagent?", uses "+esc(t.reagent):""}</small></div>
+       <label class="f" for="gl_${i}" style="margin-top:0">Where it lands</label>
+       <input type="text" id="gl_${i}" maxlength="120" data-lnote="${esc(k)}" value="${esc(L.note)}" placeholder="Druid ring on the hill east of the road">
+       ${exits.length?`<div class="reagents" style="margin-top:8px">${exits.map((nb,j)=>`<label class="reagent" for="gn_${i}_${j}"><input type="checkbox" id="gn_${i}_${j}" data-lnear="${esc(k)}" data-nb="${esc(nb)}"${L.near.includes(nb)?" checked":""}><span>Close to the ${esc(zoneName[nb])} zone line</span></label>`).join("")}</div>`:""}
+       </li>`}).join("")}</ul></div>`:""}`;
 }
 function selectTab(name){
   document.querySelectorAll(".tab").forEach(x=>x.setAttribute("aria-selected",x.dataset.tab===name));
@@ -1008,11 +1071,19 @@ function openGuide(z){guide.zone=z;combos.guideZone.sync();renderGuide();selectT
 // Typing in any directions or notes box saves right away; the rest of the page catches up when you leave the box.
 function onNoteInput(e){
   const d=e.target.dataset.dir, n=e.target.dataset.znote;
+  if(e.target.dataset.lnote!=null){setLanding(e.target.dataset.lnote,{note:e.target.value.trim().slice(0,120)});return}
   if(d!=null){const [a,b]=d.split(">");setDir(a,b,e.target.value)}
   else if(n!=null)setNote(n,e.target.value);
 }
 $("guide").addEventListener("input",onNoteInput);
-$("guide").addEventListener("focusout",e=>{if(e.target.matches("textarea")){renderRoute();renderFavs()}});
+$("guide").addEventListener("focusout",e=>{if(e.target.matches("textarea,input[type=text]")){renderRoute();renderFavs();renderPorts()}});
+$("guide").addEventListener("change",e=>{
+  const k=e.target.dataset.lnear;if(k==null)return;
+  const nb=e.target.dataset.nb, cur=(custom.landing[k]||{near:[]}).near.filter(x=>x!==nb);
+  if(e.target.checked)cur.push(nb);
+  setLanding(k,{near:cur});
+  const id=e.target.id;renderGuide();renderRoute();renderPorts();$(id)?.focus();
+});
 $("guide").addEventListener("click",e=>{
   const g=e.target.closest("[data-guide]");if(g){openGuide(g.dataset.guide);return}
   const a=e.target.closest("[data-gact]");if(!a)return;
@@ -1115,6 +1186,9 @@ $("portForm").addEventListener("submit",e=>{
   const base=DEFAULT_DATA.teleports.find(b=>portKey(b)===k);
   custom.teleports=custom.teleports.filter(x=>portKey(x)!==k);
   if(!base||JSON.stringify(base)!==JSON.stringify(t))custom.teleports.push(t); // matching the built-in exactly needs no override
+  if(wasEditing&&wasEditing!==k)delete custom.landing[wasEditing];
+  const lnote=$("ntLanding").value.trim().slice(0,120), lnear=nearChecked();
+  if(lnote||lnear.length)custom.landing[k]={note:lnote,near:lnear};else delete custom.landing[k];
   portEdit=null;fillPortForm(null);
   saveCustom();msg("portMsg",wasEditing?`Saved ${spell}.`:`Added ${spell}.`);
 });
@@ -1196,7 +1270,7 @@ rebuild();
 });
 makeCombo("favAdd",{value:()=>null,keepText:false,onPick:z=>{if(!isFav(z)){state.favs.push({z,note:""});refresh()}}});
 makeCombo("nzLink",{value:()=>null,keepText:false,onPick:z=>{if(!form.links.some(l=>l.z===z))form.links.push({z,type:"zone"});renderLinks()}});
-["ncA","ncB","ntDest"].forEach(k=>makeCombo(k,{value:()=>form[k],onPick:z=>{form[k]=z}}));
+["ncA","ncB","ntDest"].forEach(k=>makeCombo(k,{value:()=>form[k],onPick:z=>{const keep=k==="ntDest"?nearChecked():null;form[k]=z;if(keep)renderNearChoices(keep)}}));
 
 $("swap").onclick=()=>{[state.from,state.to]=[state.to,state.from];refresh()};
 $("casters").addEventListener("change",e=>{const i=e.target.dataset.i,k=e.target.dataset.k;if(i==null)return;
