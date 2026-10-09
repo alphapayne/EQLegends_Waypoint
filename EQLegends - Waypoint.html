@@ -1,0 +1,1243 @@
+<!doctype html><html><head><meta charset=utf8><meta name=viewport content="width=device-width,initial-scale=1,viewport-fit=cover"><style>:root{color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}html{scroll-padding-top:env(safe-area-inset-top,0px)}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#fff;color:#000}img{max-width:100%}[hidden]:not([hidden=until-found i]){display:none!important}</style></head><body>
+<title>Waypoint</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Alegreya:ital,wght@0,400;0,500;0,700;1,400&family=Alegreya+SC:wght@500;700&display=swap" rel="stylesheet">
+<style>
+/* Layout: settings + favorites column on the left, the route as a single drawn path on the right. Dark-first, carved-stone palette. */
+:root{
+  color-scheme:dark;
+  --stone:#252c37; --stone-2:#2f3846; --stone-3:#3b4656; --edge:#56637a;
+  --bone:#e9e2cf; --bone-dim:#b7af9b; --brass:#cfa94e; --brass-deep:#9c7a2c; --on-brass:#252c37;
+  --lapis:#5b8fd1; --druid:#7fb26f; --wizard:#a789e0; --boat:#5fb3b0; --portal:#d9849a; --warn:#e38b5c; --mark:rgba(207,169,78,.28);
+  --serif:"Alegreya",Georgia,"Times New Roman",serif;
+  --sc:"Alegreya SC","Alegreya",Georgia,serif;
+}
+@media (prefers-color-scheme:light){
+  :root:not([data-theme="dark"]){
+    color-scheme:light;
+    --stone:#dfdcd3; --stone-2:#ece9e1; --stone-3:#f6f4ee; --edge:#a39d8c;
+    --bone:#231f18; --bone-dim:#5d574a; --brass:#8a6516; --brass-deep:#6d4f10; --on-brass:#fbf8f0;
+    --lapis:#2d5f9e; --druid:#3f7a32; --wizard:#6a48ad; --boat:#2a7d7a; --portal:#a23d5a; --warn:#b4542a; --mark:rgba(138,101,22,.22);
+  }
+}
+:root[data-theme="light"]{
+  color-scheme:light;
+  --stone:#dfdcd3; --stone-2:#ece9e1; --stone-3:#f6f4ee; --edge:#a39d8c;
+  --bone:#231f18; --bone-dim:#5d574a; --brass:#8a6516; --brass-deep:#6d4f10; --on-brass:#fbf8f0;
+  --lapis:#2d5f9e; --druid:#3f7a32; --wizard:#6a48ad; --boat:#2a7d7a; --portal:#a23d5a; --warn:#b4542a; --mark:rgba(138,101,22,.22);
+}
+*,*::before,*::after{box-sizing:border-box}
+body{margin:0;background:var(--stone);color:var(--bone);font-family:var(--serif);font-size:17px;line-height:1.5}
+button,input,select,textarea{font:inherit;color:inherit}
+:focus-visible{outline:2px solid var(--brass);outline-offset:2px}
+.wrap{max-width:1180px;margin:0 auto;padding:28px 20px 60px}
+header{display:flex;flex-wrap:wrap;align-items:baseline;gap:6px 20px;margin-bottom:22px}
+h1{font-family:var(--sc);font-weight:700;font-size:2.4rem;letter-spacing:.02em;margin:0;color:var(--brass)}
+header p{margin:0;color:var(--bone-dim);max-width:60ch}
+.layout{display:grid;grid-template-columns:minmax(300px,390px) 1fr;gap:24px;align-items:start}
+.layout>*{min-width:0}
+.side{display:flex;flex-direction:column;gap:18px}
+@media (max-width:860px){.layout{grid-template-columns:1fr}}
+.panel{background:var(--stone-2);border:1px solid var(--edge);border-radius:4px;padding:18px}
+.panel h2,.addform h3{font-family:var(--sc);font-size:1.15rem;margin:0 0 4px;color:var(--brass);font-weight:700}
+label.f{display:block;font-size:.92rem;color:var(--bone-dim);margin:12px 0 4px}
+select,input[type=number],input[type=text],input[role=combobox]{width:100%;background:var(--stone-3);border:1px solid var(--edge);border-radius:3px;padding:7px 8px}
+.btn{background:var(--stone-3);border:1px solid var(--edge);border-radius:3px;padding:7px 12px;cursor:pointer}
+.btn:hover{border-color:var(--brass)}
+.btn.primary{background:var(--brass);color:var(--on-brass);border-color:var(--brass-deep);font-weight:700}
+.btn.small{padding:4px 9px;font-size:.9rem}
+.btn.danger{color:var(--warn)}
+.casters{display:flex;flex-direction:column;gap:8px;margin-top:6px}
+.caster{display:grid;grid-template-columns:86px 1fr 64px 34px;gap:6px;align-items:center}
+.caster button{height:100%}
+.hint{font-size:.88rem;color:var(--bone-dim);margin:8px 0 0}
+.warn{color:var(--warn)}
+details{margin-top:14px;border-top:1px solid var(--edge);padding-top:10px}
+summary{cursor:pointer;color:var(--bone-dim)}
+.weights{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+
+.saved{display:flex;align-items:center;gap:8px;font-size:.88rem;color:var(--bone-dim);margin:0 0 6px}
+.saved::before{content:"";width:8px;height:8px;border-radius:50%;background:var(--dot,var(--bone-dim));flex:none}
+.saved[data-s="cloud"]{--dot:var(--druid)}
+.saved[data-s="saving"]{--dot:var(--brass)}
+.saved[data-s="error"]{--dot:var(--warn)}
+
+/* Searchable zone picker */
+.zrow{display:grid;grid-template-columns:1fr auto;gap:6px;align-items:center}
+.zrow.withswap{grid-template-columns:1fr auto auto}
+.combo{position:relative;min-width:0}
+.star{width:36px;height:36px;display:grid;place-items:center;padding:0;font-size:1.15rem;line-height:1;color:var(--bone-dim)}
+.star[aria-pressed=true]{color:var(--brass);border-color:var(--brass-deep)}
+.swap{width:36px;height:36px;padding:0}
+ul.listbox{position:absolute;z-index:20;left:0;right:0;top:calc(100% + 3px);max-height:300px;overflow-y:auto;margin:0;padding:4px 0;list-style:none;background:var(--stone-3);border:1px solid var(--brass-deep);border-radius:4px;box-shadow:0 8px 24px rgba(0,0,0,.35)}
+ul.listbox li.grp{font-family:var(--sc);font-size:.85rem;color:var(--brass);padding:6px 10px 2px}
+ul.listbox li[role=option]{display:flex;justify-content:space-between;gap:10px;padding:5px 10px;cursor:pointer}
+ul.listbox li[role=option] small{color:var(--bone-dim);white-space:nowrap}
+ul.listbox li[aria-selected=true]{background:var(--stone-2);box-shadow:inset 3px 0 0 var(--brass)}
+ul.listbox li.none{padding:8px 10px;color:var(--bone-dim)}
+mark{background:var(--mark);color:inherit;border-radius:2px}
+
+/* Favorites */
+ul.favs{list-style:none;margin:10px 0 0;padding:0;display:flex;flex-direction:column;gap:10px}
+.fav{border:1px solid var(--edge);border-radius:3px;padding:10px;background:var(--stone-3)}
+.fav-head{display:flex;justify-content:space-between;gap:8px;align-items:baseline}
+.fav-name{font-weight:700}
+.fav-cont{font-size:.85rem;color:var(--bone-dim)}
+.fav input{margin-top:6px;background:var(--stone-2);font-size:.95rem}
+.fav-actions{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px}
+.fav-actions .btn{background:var(--stone-2)}
+.fav-actions .rm{margin-left:auto}
+.fav-empty{color:var(--bone-dim);font-size:.95rem;margin:10px 0 0}
+
+/* Tabs */
+.tabs{display:flex;gap:4px;border-bottom:1px solid var(--edge);margin-bottom:16px;flex-wrap:wrap}
+.tab{background:none;border:1px solid transparent;border-bottom:none;padding:8px 14px;cursor:pointer;color:var(--bone-dim);border-radius:4px 4px 0 0;font-family:var(--sc)}
+.tab[aria-selected=true]{background:var(--stone-2);border-color:var(--edge);color:var(--brass);margin-bottom:-1px}
+.summary{display:flex;flex-wrap:wrap;gap:6px 22px;margin:0 0 18px;color:var(--bone-dim);font-variant-numeric:tabular-nums}
+.summary strong{color:var(--bone);font-size:1.25rem}
+
+/* The route path: the one bold element */
+ol.route{list-style:none;margin:0;padding:0;position:relative}
+ol.route li{position:relative;padding:0 0 22px 46px}
+ol.route li::before{content:"";position:absolute;left:15px;top:30px;bottom:-2px;width:2px;background:var(--line,var(--edge))}
+ol.route li:last-child::before{display:none}
+ol.route li.zone{--line:var(--bone-dim)}
+ol.route li.boat{--line:var(--boat)}
+ol.route li.portal{--line:var(--portal)}
+ol.route li.spell{--line:var(--wizard)}
+ol.route li.spell.druid{--line:var(--druid)}
+ol.route li.gate{--line:var(--lapis)}
+.node{position:absolute;left:0;top:0;width:32px;height:32px;border-radius:50%;display:grid;place-items:center;background:var(--stone-3);border:2px solid var(--c,var(--edge));font-size:15px}
+li.zone .node{--c:var(--bone-dim)} li.boat .node{--c:var(--boat)} li.portal .node{--c:var(--portal)} li.spell .node{--c:var(--wizard)}
+li.spell.druid .node{--c:var(--druid)} li.gate .node{--c:var(--lapis)}
+li.start .node,li.end .node{--c:var(--brass);background:var(--brass);color:var(--on-brass)}
+.step-zone{font-size:1.2rem;font-weight:700;line-height:1.3}
+.step-how{color:var(--bone-dim);font-size:.95rem}
+.step-how b{color:var(--bone);font-weight:500}
+.step-fav{font-size:.9rem;color:var(--brass);margin-top:2px}
+.empty{color:var(--bone-dim);padding:20px 0;max-width:55ch}
+table{width:100%;border-collapse:collapse;font-size:.95rem}
+.tablewrap{overflow-x:auto}
+th,td{text-align:left;padding:6px 8px;border-bottom:1px solid var(--edge);vertical-align:top}
+th{font-family:var(--sc);color:var(--brass);font-weight:500}
+td{font-variant-numeric:tabular-nums}
+tr.off td{color:var(--bone-dim);opacity:.6}
+textarea{width:100%;min-height:260px;background:var(--stone-3);border:1px solid var(--edge);border-radius:3px;padding:10px;font-family:ui-monospace,Consolas,monospace;font-size:.82rem;line-height:1.45}
+.row{display:flex;gap:8px;flex-wrap:wrap;margin-top:10px;align-items:center}
+.note{border-left:3px solid var(--warn);padding:8px 12px;background:var(--stone-3);margin:0 0 16px;font-size:.93rem}
+.legend{display:flex;flex-wrap:wrap;gap:14px;font-size:.88rem;color:var(--bone-dim);margin-top:18px}
+.legend span::before{content:"";display:inline-block;width:10px;height:10px;border-radius:50%;margin-right:6px;background:var(--c)}
+
+/* Add locations */
+.addgrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:16px}
+.addform{background:var(--stone-2);border:1px solid var(--edge);border-radius:4px;padding:16px;min-width:0}
+.addform.wide{grid-column:1/-1}
+.two{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.two>*{min-width:0}
+ul.links{list-style:none;margin:8px 0 0;padding:0;display:flex;flex-direction:column;gap:6px}
+ul.links li{display:grid;grid-template-columns:1fr minmax(120px,170px) auto;gap:6px;align-items:center;font-size:.95rem}
+ul.mine{list-style:none;margin:6px 0 0;padding:0}
+ul.mine li{display:flex;justify-content:space-between;gap:10px;align-items:baseline;padding:6px 0;border-bottom:1px solid var(--edge)}
+ul.mine li span{min-width:0}
+ul.mine li small{color:var(--bone-dim)}
+.mine-h{font-size:.95rem;color:var(--bone-dim);margin:14px 0 0}
+.msg{font-size:.9rem;margin:8px 0 0;min-height:1.3em}
+
+/* Directions and zone notes */
+.step-zone button{all:unset;cursor:pointer;border-bottom:1px dotted var(--bone-dim)}
+.step-zone button:hover{color:var(--brass);border-color:var(--brass)}
+.step-zone button:focus-visible{outline:2px solid var(--brass);outline-offset:2px}
+.step-dir{font-size:.95rem;margin-top:3px;padding-left:10px;border-left:2px solid var(--line,var(--edge))}
+.step-dir span{color:var(--bone-dim)}
+.step-note{font-size:.93rem;margin-top:3px;font-style:italic}
+.step-edit{all:unset;cursor:pointer;font-size:.85rem;color:var(--bone-dim);margin-top:4px;display:inline-block}
+.step-edit:hover{color:var(--brass)}
+.step-edit:focus-visible{outline:2px solid var(--brass);outline-offset:2px}
+.editor{margin-top:8px;padding:10px;background:var(--stone-2);border:1px solid var(--edge);border-radius:3px;display:flex;flex-direction:column;gap:4px;max-width:60ch}
+.editor label{font-size:.88rem;color:var(--bone-dim)}
+.editor textarea,.guide textarea{min-height:0;height:auto;font-family:var(--serif);font-size:.95rem;line-height:1.4;padding:6px 8px;resize:vertical}
+.guide{display:flex;flex-direction:column;gap:16px}
+.guide-head{display:flex;flex-wrap:wrap;gap:8px 14px;align-items:baseline}
+.guide-head h3{font-family:var(--sc);font-size:1.5rem;margin:0;color:var(--bone)}
+.guide-head small{color:var(--bone-dim)}
+.guide h4{font-family:var(--sc);font-weight:500;color:var(--brass);font-size:1.05rem;margin:0 0 6px}
+ul.exits{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:10px}
+ul.exits li{border:1px solid var(--edge);border-radius:3px;padding:10px;background:var(--stone-2)}
+.exit-head{display:flex;flex-wrap:wrap;justify-content:space-between;gap:4px 10px;margin-bottom:6px}
+.exit-head small{color:var(--bone-dim)}
+.exit-head button{all:unset;cursor:pointer;font-weight:700;border-bottom:1px dotted var(--bone-dim)}
+.exit-head button:focus-visible{outline:2px solid var(--brass);outline-offset:2px}
+
+/* Reagents and teleport management */
+.reagents{display:flex;flex-direction:column;gap:6px;margin-top:6px}
+.reagent{display:grid;grid-template-columns:auto 1fr;gap:8px;align-items:start;font-size:.95rem;cursor:pointer}
+.reagent input{width:18px;height:18px;margin:3px 0 0;accent-color:var(--brass)}
+.reagent small{display:block;color:var(--bone-dim);font-size:.85rem}
+.tip{border-left:3px solid var(--brass);padding:8px 12px;background:var(--stone-2);margin:0 0 16px;font-size:.95rem}
+.tip button{all:unset;cursor:pointer;color:var(--brass);border-bottom:1px dotted var(--brass)}
+.tip button:focus-visible{outline:2px solid var(--brass);outline-offset:2px}
+td.acts{white-space:nowrap;text-align:right}
+td.acts .btn{margin-left:4px}
+.tag{display:inline-block;font-size:.78rem;padding:0 6px;border:1px solid var(--edge);border-radius:999px;color:var(--bone-dim);margin-left:4px;vertical-align:1px}
+.tag.miss{color:var(--warn);border-color:var(--warn)}
+#portForm{margin-bottom:18px}
+#portForm.editing{border-color:var(--brass)}
+.three{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+.three>*{min-width:0}
+@media (max-width:520px){.three{grid-template-columns:1fr 1fr}}
+@media (prefers-reduced-motion:no-preference){ol.route li{animation:in .25s ease both}@keyframes in{from{opacity:.2;transform:translateX(-6px)}}}
+ol.route.still li{animation:none}
+</style>
+
+<div class="wrap">
+  <header>
+    <h1>Waypoint</h1>
+    <p>Find the fastest way across Antonica, Faydwer, Odus and the Planes in EverQuest Legends, using the teleports your classes (and your friends) can cast.</p>
+  </header>
+
+  <div class="layout">
+    <div class="side">
+      <section class="panel" aria-label="Trip settings">
+        <h2>Your trip</h2>
+        <p class="saved" id="saved" data-s="local" role="status">Saved in this browser</p>
+
+        <label class="f" for="from">Starting zone</label>
+        <div class="zrow withswap">
+          <div class="combo"><input id="from" role="combobox" aria-expanded="false" aria-controls="from-list" aria-autocomplete="list" autocomplete="off" spellcheck="false"><ul class="listbox" id="from-list" role="listbox" aria-label="Starting zone" hidden></ul></div>
+          <button class="btn star" id="from-star" aria-pressed="false">☆</button>
+          <button class="btn swap" id="swap" title="Swap start and destination" aria-label="Swap start and destination">⇅</button>
+        </div>
+
+        <label class="f" for="to">Destination</label>
+        <div class="zrow">
+          <div class="combo"><input id="to" role="combobox" aria-expanded="false" aria-controls="to-list" aria-autocomplete="list" autocomplete="off" spellcheck="false"><ul class="listbox" id="to-list" role="listbox" aria-label="Destination" hidden></ul></div>
+          <button class="btn star" id="to-star" aria-pressed="false">☆</button>
+        </div>
+
+        <label class="f" for="bind">Bind point (used by Gate)</label>
+        <div class="zrow">
+          <div class="combo"><input id="bind" role="combobox" aria-expanded="false" aria-controls="bind-list" aria-autocomplete="list" autocomplete="off" spellcheck="false"><ul class="listbox" id="bind-list" role="listbox" aria-label="Bind point" hidden></ul></div>
+          <button class="btn star" id="bind-star" aria-pressed="false">☆</button>
+        </div>
+        <p class="hint">Type part of a zone name or a nickname like nro, ec, lguk, pof or poh.</p>
+
+        <label class="f">Casters available</label>
+        <div class="casters" id="casters"></div>
+        <div class="row"><button class="btn small" id="addMe">Add my class</button><button class="btn small" id="addFriend">Add a friend's class</button></div>
+        <p class="hint" id="casterHint"></p>
+
+        <div id="reagentWrap" hidden>
+          <label class="f">Reagents on hand</label>
+          <div class="reagents" id="reagents"></div>
+          <p class="hint">Teleports that need a reagent you don't have are left out of routes.</p>
+        </div>
+
+        <details>
+          <summary>Route preferences</summary>
+          <p class="hint">Lower numbers make that kind of travel more attractive.</p>
+          <div class="weights">
+            <div><label class="f" for="wZone">Zone line</label><input type="number" id="wZone" min="0.1" step="0.5"></div>
+            <div><label class="f" for="wBoat">Boat ride</label><input type="number" id="wBoat" min="0.1" step="0.5"></div>
+            <div><label class="f" for="wPort">Teleport</label><input type="number" id="wPort" min="0.1" step="0.5"></div>
+          </div>
+          <div class="row"><button class="btn small danger" id="clearSaved">Clear saved settings</button></div>
+        </details>
+      </section>
+
+      <section class="panel" aria-label="Favorite zones">
+        <h2>Favorites</h2>
+        <label class="f" for="favAdd">Add a favorite</label>
+        <div class="combo"><input id="favAdd" role="combobox" aria-expanded="false" aria-controls="favAdd-list" aria-autocomplete="list" autocomplete="off" spellcheck="false" placeholder="Search zones"><ul class="listbox" id="favAdd-list" role="listbox" aria-label="Add a favorite" hidden></ul></div>
+        <ul class="favs" id="favs"></ul>
+      </section>
+    </div>
+
+    <section>
+      <div class="tabs" role="tablist">
+        <button class="tab" role="tab" id="t-route" aria-selected="true" data-tab="route">Route</button>
+        <button class="tab" role="tab" id="t-guide" aria-selected="false" data-tab="guide">Zone guide</button>
+        <button class="tab" role="tab" id="t-ports" aria-selected="false" data-tab="ports">Teleports</button>
+        <button class="tab" role="tab" id="t-add" aria-selected="false" data-tab="add">Add locations</button>
+      </div>
+
+      <div id="tab-route" role="tabpanel">
+        <div id="reagentTip"></div>
+        <div class="summary" id="summary"></div>
+        <ol class="route" id="route"></ol>
+        <div class="legend">
+          <span style="--c:var(--bone-dim)">Zone line</span>
+          <span style="--c:var(--boat)">Boat</span>
+          <span style="--c:var(--portal)">Portal</span>
+          <span style="--c:var(--druid)">Druid ring</span>
+          <span style="--c:var(--wizard)">Wizard spell</span>
+          <span style="--c:var(--lapis)">Gate to bind</span>
+        </div>
+      </div>
+
+      <div id="tab-guide" role="tabpanel" hidden>
+        <label class="f" for="guideZone" style="margin-top:0">Look up a zone</label>
+        <div class="combo" style="max-width:420px"><input id="guideZone" role="combobox" aria-expanded="false" aria-controls="guideZone-list" aria-autocomplete="list" autocomplete="off" spellcheck="false"><ul class="listbox" id="guideZone-list" role="listbox" aria-label="Zone to look up" hidden></ul></div>
+        <p class="hint">Write down where things are as you learn them. Notes and directions save as you type and show up on every route that passes through.</p>
+        <div class="guide" id="guide" style="margin-top:16px"></div>
+      </div>
+
+      <div id="tab-ports" role="tabpanel" hidden>
+        <form class="addform" id="portForm" novalidate>
+          <h3 id="portFormTitle">Add a teleport</h3>
+          <div class="two">
+            <div><label class="f" for="ntSpell">Spell name</label><input type="text" id="ntSpell" maxlength="60" placeholder="Ring of Grobb"></div>
+            <div><label class="f" for="ntDest">Lands in</label>
+              <div class="combo"><input id="ntDest" role="combobox" aria-expanded="false" aria-controls="ntDest-list" aria-autocomplete="list" autocomplete="off" spellcheck="false" placeholder="Search zones"><ul class="listbox" id="ntDest-list" role="listbox" aria-label="Landing zone" hidden></ul></div></div>
+          </div>
+          <div class="three">
+            <div><label class="f" for="ntCls">Class</label><select id="ntCls"></select></div>
+            <div><label class="f" for="ntLvl">Level</label><input type="number" id="ntLvl" min="1" max="70" value="24"></div>
+            <div><label class="f" for="ntGroup">Who it moves</label><select id="ntGroup"><option value="group">Whole group</option><option value="self">Caster only</option></select></div>
+          </div>
+          <div class="two">
+            <div><label class="f" for="ntKind">Kind</label><select id="ntKind"><option value="port">Portal, gate or ring</option><option value="evac">Succor or Evacuate</option></select></div>
+            <div><label class="f" for="ntReagent">Reagent (optional)</label><input type="text" id="ntReagent" maxlength="60" placeholder="Fuligan Soulstone of Innoruuk"></div>
+          </div>
+          <div class="row"><button class="btn primary" type="submit" id="portSubmit">Add teleport</button><button class="btn" type="button" id="portCancel" hidden>Cancel</button></div>
+          <p class="msg" id="portMsg" role="status"></p>
+        </form>
+        <p class="hint" style="margin:0 0 12px">Every teleport Waypoint knows about. Faded rows aren't available with your current casters or reagents. Edit any of them to fix a level or landing zone; removed built-in spells can be restored below.</p>
+        <div class="tablewrap"><table><thead><tr><th>Spell</th><th>Class</th><th>Level</th><th>Lands in</th><th>Moves</th><th>Reagent</th><th aria-label="Actions"></th></tr></thead><tbody id="portRows"></tbody></table></div>
+        <details id="removedWrap" hidden><summary id="removedSummary">Removed spells</summary><ul class="mine" id="removedList"></ul></details>
+      </div>
+
+      <div id="tab-add" role="tabpanel" hidden>
+        <p class="note">Built-in spell levels and zone links are based on classic EverQuest and the EQL wikis, and some may be off. Anything you add here is saved with your settings and kept separate from the built-in map, so future map updates won't overwrite it. Teleport spells are managed in the Teleports tab.</p>
+        <div class="addgrid">
+          <form class="addform wide" id="zoneForm" novalidate>
+            <h3>Add a zone</h3>
+            <div class="two">
+              <div><label class="f" for="nzName">Zone name</label><input type="text" id="nzName" maxlength="60" placeholder="Kurn's Tower"></div>
+              <div><label class="f" for="nzCont">Region</label><input type="text" id="nzCont" list="contList" maxlength="40" placeholder="Antonica"></div>
+            </div>
+            <datalist id="contList"></datalist>
+            <label class="f" for="nzAlias">Nicknames for search (optional, separated by commas)</label>
+            <input type="text" id="nzAlias" maxlength="120" placeholder="kurn, kurns">
+            <label class="f" for="nzLink">Connected zones</label>
+            <div class="combo"><input id="nzLink" role="combobox" aria-expanded="false" aria-controls="nzLink-list" aria-autocomplete="list" autocomplete="off" spellcheck="false" placeholder="Search for a neighboring zone"><ul class="listbox" id="nzLink-list" role="listbox" aria-label="Connected zone" hidden></ul></div>
+            <ul class="links" id="nzLinks"></ul>
+            <div class="two">
+              <div><label class="f" for="nzLvl">Level needed to enter (optional)</label><input type="number" id="nzLvl" min="1" max="70" placeholder="None"></div>
+              <div><label class="f" for="nzNote">Entrance note (optional)</label><input type="text" id="nzNote" maxlength="80" placeholder="Door behind the waterfall"></div>
+            </div>
+            <div class="row"><button class="btn primary" type="submit">Add zone</button></div>
+            <p class="msg" id="zoneMsg" role="status"></p>
+          </form>
+
+          <form class="addform" id="connForm" novalidate>
+            <h3>Link two zones</h3>
+            <label class="f" for="ncA">From</label>
+            <div class="combo"><input id="ncA" role="combobox" aria-expanded="false" aria-controls="ncA-list" aria-autocomplete="list" autocomplete="off" spellcheck="false" placeholder="Search zones"><ul class="listbox" id="ncA-list" role="listbox" aria-label="From zone" hidden></ul></div>
+            <label class="f" for="ncB">To</label>
+            <div class="combo"><input id="ncB" role="combobox" aria-expanded="false" aria-controls="ncB-list" aria-autocomplete="list" autocomplete="off" spellcheck="false" placeholder="Search zones"><ul class="listbox" id="ncB-list" role="listbox" aria-label="To zone" hidden></ul></div>
+            <label class="f" for="ncType">How you travel</label>
+            <select id="ncType">
+              <option value="zone">Zone line (both ways)</option>
+              <option value="boat">Boat (both ways)</option>
+              <option value="portal">Portal (both ways)</option>
+              <option value="portal1">Portal (one way, From → To)</option>
+            </select>
+            <div class="two">
+              <div><label class="f" for="ncLvl">Level needed</label><input type="number" id="ncLvl" min="1" max="70" placeholder="None"></div>
+              <div><label class="f" for="ncNote">Note</label><input type="text" id="ncNote" maxlength="80" placeholder="Optional"></div>
+            </div>
+            <div class="row"><button class="btn primary" type="submit">Add link</button></div>
+            <p class="msg" id="connMsg" role="status"></p>
+          </form>
+
+          <div class="addform">
+            <h3>Teleport spells</h3>
+            <p class="hint" style="margin-top:0">Add, edit and remove teleports in the <button type="button" class="btn small" data-goto="ports">Teleports</button> tab.</p>
+          </div>
+
+          <section class="addform wide" aria-label="Your additions">
+            <h3>Your additions</h3>
+            <div id="mine"></div>
+            <details>
+              <summary>Back up or edit your additions as text</summary>
+              <p class="hint">Copy this text to keep a backup or share it with a friend, who can paste it here and save. Zones are [id, name, region, nicknames]; links are [zoneA, zoneB, "zone" | "boat" | "portal", {oneway, minLevel, note}]; teleports have spell, cls, level, dest, group and an optional reagent; notes are zone id → text; directions are "fromId&gt;toId" → text.</p>
+              <textarea id="dataText" spellcheck="false" aria-label="Your additions as JSON"></textarea>
+              <div class="row">
+                <button class="btn primary" id="saveData" type="button">Save text</button>
+                <button class="btn" id="copyData" type="button">Copy</button>
+                <button class="btn danger" id="resetData" type="button">Remove all my additions</button>
+                <span id="dataMsg" class="hint" role="status"></span>
+              </div>
+            </details>
+          </section>
+        </div>
+      </div>
+    </section>
+  </div>
+</div>
+
+<script>
+const CLASSES=["Bard","Beastlord","Berserker","Cleric","Druid","Enchanter","Magician","Monk","Necromancer","Paladin","Ranger","Rogue","Shadow Knight","Shaman","Warrior","Wizard"];
+
+const DEFAULT_DATA={
+ zones:[
+  ["southqeynos","South Qeynos","Antonica"],["northqeynos","North Qeynos","Antonica"],["qcat","Qeynos Aqueducts","Antonica"],
+  ["qeynoshills","Qeynos Hills","Antonica"],["surefall","Surefall Glade","Antonica"],["blackburrow","Blackburrow","Antonica"],
+  ["everfrost","Everfrost Peaks","Antonica"],["halas","Halas","Antonica"],["permafrost","Permafrost Keep","Antonica"],
+  ["westkarana","West Karana","Antonica"],["northkarana","North Karana","Antonica"],["eastkarana","East Karana","Antonica"],
+  ["southkarana","South Karana","Antonica"],["paw","Splitpaw Lair","Antonica"],["lakerathe","Lake Rathetear","Antonica"],
+  ["arena","The Arena","Antonica"],["rathemtn","Rathe Mountains","Antonica"],["feerrott","The Feerrott","Antonica"],
+  ["cazic","Cazic-Thule","Antonica"],["oggok","Oggok","Antonica"],["innothule","Innothule Swamp","Antonica"],
+  ["grobb","Grobb","Antonica"],["guk","Upper Guk","Antonica"],["lguk","Lower Guk","Antonica"],["southro","South Ro","Antonica"],["oasis","Oasis of Marr","Antonica"],
+  ["northro","North Ro","Antonica"],["efreeport","East Freeport","Antonica"],["nfreeport","North Freeport","Antonica"],
+  ["wfreeport","West Freeport","Antonica"],["ecommons","East Commonlands","Antonica"],["wcommons","West Commonlands","Antonica"],
+  ["befallen","Befallen","Antonica"],["nektulos","Nektulos Forest","Antonica"],["neriak","Neriak","Antonica"],
+  ["lavastorm","Lavastorm Mountains","Antonica"],["najena","Najena","Antonica"],["sola","Solusek's Eye","Antonica"],
+  ["kithicor","Kithicor Forest","Antonica"],["rivervale","Rivervale","Antonica"],["misty","Misty Thicket","Antonica"],
+  ["runnyeye","Runnyeye Citadel","Antonica"],["beholder","Gorge of King Xorbb","Antonica"],["highpass","Highpass Hold","Antonica"],
+  ["highkeep","High Keep","Antonica"],
+  ["oot","Ocean of Tears","Seas"],["erudsxing","Erud's Crossing","Seas"],
+  ["butcher","Butcherblock Mountains","Faydwer"],["kaladim","Kaladim","Faydwer"],["gfaydark","Greater Faydark (Kelethin)","Faydwer"],
+  ["felwithe","Felwithe","Faydwer"],["lfaydark","Lesser Faydark","Faydwer"],["crushbone","Crushbone","Faydwer"],
+  ["steamfont","Steamfont Mountains","Faydwer"],["akanon","Ak'Anon","Faydwer"],["mistmoore","Castle Mistmoore","Faydwer"],
+  ["cauldron","Dagnor's Cauldron","Faydwer"],["unrest","Estate of Unrest","Faydwer"],["kedge","Kedge Keep","Faydwer"],
+  ["erudin","Erudin","Odus"],["tox","Toxxulia Forest","Odus"],["kerra","Kerra Isle","Odus"],["paineel","Paineel","Odus"],["hole","Ruins of Paineel (The Hole)","Odus"],
+  ["fear","Plane of Fear","Planes"],["hate","Plane of Hate","Planes"],["airplane","Plane of Sky","Planes"]
+ ],
+ connections:[
+  ["southqeynos","northqeynos","zone"],["southqeynos","qcat","zone"],["northqeynos","qcat","zone"],["northqeynos","qeynoshills","zone"],
+  ["qeynoshills","surefall","zone"],["qeynoshills","blackburrow","zone"],["qeynoshills","westkarana","zone"],
+  ["blackburrow","everfrost","zone"],["everfrost","halas","zone"],["everfrost","permafrost","zone"],
+  ["westkarana","northkarana","zone"],["northkarana","eastkarana","zone"],["northkarana","southkarana","zone"],
+  ["southkarana","paw","zone"],["southkarana","lakerathe","zone"],["lakerathe","arena","zone"],["lakerathe","rathemtn","zone"],
+  ["rathemtn","feerrott","zone"],["feerrott","cazic","zone"],["feerrott","oggok","zone"],["feerrott","innothule","zone"],
+  ["innothule","grobb","zone"],["innothule","guk","zone"],["innothule","southro","zone"],["southro","oasis","zone"],
+  ["oasis","northro","zone"],["northro","efreeport","zone"],["northro","ecommons","zone"],
+  ["efreeport","nfreeport","zone"],["nfreeport","wfreeport","zone"],["wfreeport","ecommons","zone"],
+  ["ecommons","wcommons","zone"],["ecommons","nektulos","zone"],["wcommons","befallen","zone"],["wcommons","kithicor","zone"],
+  ["nektulos","neriak","zone"],["nektulos","lavastorm","zone"],["lavastorm","najena","zone"],["lavastorm","sola","zone"],
+  ["kithicor","rivervale","zone"],["kithicor","highpass","zone"],["highpass","highkeep","zone"],["highpass","eastkarana","zone"],
+  ["rivervale","misty","zone"],["misty","runnyeye","zone"],["runnyeye","beholder","zone"],["beholder","eastkarana","zone"],
+  ["efreeport","oot","boat"],["oot","butcher","boat"],["southqeynos","erudsxing","boat"],["erudsxing","erudin","boat"],
+  ["butcher","kaladim","zone"],["butcher","gfaydark","zone"],["butcher","cauldron","zone"],["gfaydark","felwithe","zone"],
+  ["gfaydark","lfaydark","zone"],["gfaydark","crushbone","zone"],["lfaydark","steamfont","zone"],["lfaydark","mistmoore","zone"],
+  ["steamfont","akanon","zone"],["cauldron","unrest","zone"],["cauldron","kedge","zone"],
+  ["erudin","tox","zone"],["tox","kerra","zone"],["tox","paineel","zone"],["paineel","hole","zone"],["guk","lguk","zone"],
+  ["feerrott","fear","portal",{oneway:true,minLevel:46,note:"The portal is in the spectre caves."}],
+  ["fear","feerrott","portal",{oneway:true,note:"Exit portal on the Temple's second floor: enter from the outside ledge and follow the left wall. Where it lands is unconfirmed."}],
+  ["oasis","hate","portal",{oneway:true,minLevel:46,note:"Climb the tower and touch the black sword at the top."}],
+  ["efreeport","airplane","portal",{oneway:true,minLevel:46,note:"In the water near the southeast docks. You need island keys once inside."}]
+ ],
+ teleports:[
+  {spell:"Ring of Butcher",cls:"Druid",level:24,dest:"butcher",group:true},
+  {spell:"Ring of Commons",cls:"Druid",level:24,dest:"ecommons",group:true},
+  {spell:"Ring of Karana",cls:"Druid",level:24,dest:"northkarana",group:true},
+  {spell:"Ring of Toxxulia",cls:"Druid",level:24,dest:"tox",group:true},
+  {spell:"Ring of Feerrott",cls:"Druid",level:29,dest:"feerrott",group:true},
+  {spell:"Ring of Lavastorm",cls:"Druid",level:29,dest:"lavastorm",group:true},
+  {spell:"Ring of Ro",cls:"Druid",level:29,dest:"southro",group:true},
+  {spell:"Ring of Steamfont",cls:"Druid",level:29,dest:"steamfont",group:true},
+  {spell:"Ring of Misty",cls:"Druid",level:29,dest:"misty",group:true},
+  {spell:"Ring of Surefall Glade",cls:"Druid",level:29,dest:"surefall",group:true},
+  {spell:"North Gate",cls:"Wizard",level:24,dest:"northkarana",group:false},
+  {spell:"Common Gate",cls:"Wizard",level:24,dest:"wcommons",group:false},
+  {spell:"Tox Gate",cls:"Wizard",level:24,dest:"tox",group:false},
+  {spell:"Nek Gate",cls:"Wizard",level:24,dest:"nektulos",group:false},
+  {spell:"Fay Gate",cls:"Wizard",level:24,dest:"gfaydark",group:false},
+  {spell:"Ro Gate",cls:"Wizard",level:24,dest:"southro",group:false},
+  {spell:"Cazic Gate",cls:"Wizard",level:24,dest:"feerrott",group:false},
+  {spell:"North Portal",cls:"Wizard",level:29,dest:"northkarana",group:true},
+  {spell:"Common Portal",cls:"Wizard",level:29,dest:"wcommons",group:true},
+  {spell:"Tox Portal",cls:"Wizard",level:29,dest:"tox",group:true},
+  {spell:"Nek Portal",cls:"Wizard",level:29,dest:"nektulos",group:true},
+  {spell:"Fay Portal",cls:"Wizard",level:29,dest:"gfaydark",group:true},
+  {spell:"Ro Portal",cls:"Wizard",level:29,dest:"southro",group:true},
+  {spell:"Cazic Portal",cls:"Wizard",level:29,dest:"feerrott",group:true},
+  {spell:"Succor: East",cls:"Druid",level:29,dest:"eastkarana",group:true,evac:true},
+  {spell:"Succor: Butcher",cls:"Druid",level:34,dest:"butcher",group:true,evac:true},
+  {spell:"Succor: Ro",cls:"Druid",level:39,dest:"southro",group:true,evac:true},
+  {spell:"Succor: Lavastorm",cls:"Druid",level:41,dest:"lavastorm",group:true,evac:true},
+  {spell:"Succor: North",cls:"Druid",level:49,dest:"northkarana",group:true,evac:true},
+  {spell:"Evacuate: North",cls:"Wizard",level:29,dest:"northkarana",group:true,evac:true},
+  {spell:"Evacuate: Fay",cls:"Wizard",level:34,dest:"gfaydark",group:true,evac:true},
+  {spell:"Evacuate: Ro",cls:"Wizard",level:39,dest:"southro",group:true,evac:true},
+  {spell:"Evacuate: Nek",cls:"Wizard",level:44,dest:"nektulos",group:true,evac:true},
+  {spell:"Evacuate: West",cls:"Wizard",level:49,dest:"westkarana",group:true,evac:true},
+  {spell:"Alter Plane: Hate",cls:"Wizard",level:46,dest:"hate",group:true,reagent:"Fuligan Soulstone of Innoruuk"}
+ ],
+ gate:{"Cleric":5,"Druid":5,"Shaman":5,"Necromancer":5,"Wizard":5,"Magician":5,"Enchanter":5}
+};
+
+// Nicknames players type. Only used for search.
+const ALIASES={
+  southqeynos:["sq","qeynos"],northqeynos:["nq","qeynos"],qcat:["catacombs","aqueducts"],qeynoshills:["qh","qhills"],
+  blackburrow:["bb"],everfrost:["ef"],permafrost:["perma"],westkarana:["wk","karana"],northkarana:["nk","karana"],
+  eastkarana:["ek","karana"],southkarana:["sk","karana"],paw:["splitpaw"],lakerathe:["rathe"],rathemtn:["rathe"],
+  cazic:["ct","cazic thule"],innothule:["inno"],guk:["guk","uguk"],lguk:["lguk","guk"],southro:["sro"],northro:["nro"],
+  efreeport:["efp","freeport","fp"],nfreeport:["nfp","freeport","fp"],wfreeport:["wfp","freeport","fp"],
+  ecommons:["ec","commons"],wcommons:["wc","commons"],nektulos:["nek"],lavastorm:["lava"],sola:["soleye","sol a"],
+  kithicor:["kith"],runnyeye:["ry"],beholder:["gorge","xorbb"],highpass:["hp"],highkeep:["hk"],
+  oot:["ocean"],erudsxing:["eruds crossing","xing"],butcher:["bb","bbm","butcherblock"],gfaydark:["gfay","kelethin"],
+  lfaydark:["lfay"],crushbone:["cb"],steamfont:["sf"],akanon:["ak"],mistmoore:["mm"],cauldron:["dc"],tox:["toxx"],
+  hole:["hole","ruins"],fear:["pof","fear"],hate:["poh","hate"],airplane:["pos","sky","plane of air"]
+};
+const TRAVEL_LABEL={zone:"Zone line",boat:"Boat",portal:"Portal"};
+
+/* ---------- Persistence ----------
+   Two private records on your Claude account (mirrored in this browser):
+   settings = classes, bind point, trip, favorites; custom = zones, links and teleports you added.
+   The built-in map lives in the page, so updates to it never overwrite your additions. */
+const KEY="eql-waypoint-v1";
+function lsGet(k,d){try{const v=localStorage.getItem(KEY+k);return v?JSON.parse(v):d}catch(e){return d}}
+function lsSet(k,v){try{localStorage.setItem(KEY+k,JSON.stringify(v))}catch(e){}}
+function lsDel(k){try{localStorage.removeItem(KEY+k)}catch(e){}}
+const clone=o=>JSON.parse(JSON.stringify(o));
+
+const DEFAULT_STATE={from:"southqeynos",to:"akanon",bind:"southqeynos",
+  casters:[{who:"me",cls:"Druid",level:30},{who:"me",cls:"Wizard",level:20}],
+  w:{zone:1,boat:4,port:1.5},favs:[],reagents:{}};
+const EMPTY_CUSTOM={zones:[],connections:[],teleports:[],removedTeleports:[],gate:{},notes:{},directions:{}};
+const reagentKey=s=>String(s||"").trim().toLowerCase();
+const NOTE_MAX=500, DIR_MAX=300;
+
+function validData(d){return d&&Array.isArray(d.zones)&&Array.isArray(d.connections)&&Array.isArray(d.teleports)&&d.gate&&typeof d.gate==="object"}
+function normalizeState(s){
+  const out=clone(DEFAULT_STATE);
+  if(s&&typeof s==="object"){
+    ["from","to","bind"].forEach(k=>{if(typeof s[k]==="string")out[k]=s[k]});
+    if(Array.isArray(s.casters))out.casters=s.casters.filter(c=>c&&CLASSES.includes(c.cls))
+      .map(c=>({who:c.who==="friend"?"friend":"me",cls:c.cls,level:Math.max(1,Math.min(70,+c.level||1))}));
+    if(s.w)["zone","boat","port"].forEach(k=>{if(+s.w[k]>0)out.w[k]=+s.w[k]});
+    if(s.reagents&&typeof s.reagents==="object")Object.entries(s.reagents).forEach(([k,v])=>{if(v)out.reagents[reagentKey(k)]=true});
+    if(Array.isArray(s.favs))out.favs=s.favs.filter(f=>f&&typeof f.z==="string").map(f=>({z:f.z,note:String(f.note||"").slice(0,200)}));
+  }
+  return out;
+}
+function normalizeCustom(c){
+  const out=clone(EMPTY_CUSTOM);
+  if(!c||typeof c!=="object")return out;
+  if(Array.isArray(c.zones))out.zones=c.zones.filter(z=>Array.isArray(z)&&typeof z[0]==="string"&&typeof z[1]==="string")
+    .map(z=>[z[0],z[1],String(z[2]||"Other"),Array.isArray(z[3])?z[3].map(String):[]]);
+  if(Array.isArray(c.connections))out.connections=c.connections.filter(x=>Array.isArray(x)&&typeof x[0]==="string"&&typeof x[1]==="string")
+    .map(x=>{const t=["zone","boat","portal"].includes(x[2])?x[2]:"zone";const o=x[3]&&typeof x[3]==="object"?x[3]:{};
+      const opt={};if(o.oneway)opt.oneway=true;if(+o.minLevel>0)opt.minLevel=Math.min(70,Math.round(+o.minLevel));if(o.note)opt.note=String(o.note).slice(0,80);
+      return Object.keys(opt).length?[x[0],x[1],t,opt]:[x[0],x[1],t]});
+  if(Array.isArray(c.teleports))out.teleports=c.teleports.filter(t=>t&&t.spell&&CLASSES.includes(t.cls)&&typeof t.dest==="string")
+    .map(t=>{const o={spell:String(t.spell).slice(0,60),cls:t.cls,level:Math.max(1,Math.min(70,+t.level||1)),dest:t.dest,group:!!t.group};if(t.reagent)o.reagent=String(t.reagent).slice(0,60);if(t.evac)o.evac=true;return o});
+  if(Array.isArray(c.removedTeleports))out.removedTeleports=[...new Set(c.removedTeleports.filter(k=>typeof k==="string"&&k.includes("|")))];
+  if(c.gate&&typeof c.gate==="object")Object.entries(c.gate).forEach(([k,v])=>{if(CLASSES.includes(k)&&+v>0)out.gate[k]=+v});
+  // notes: zoneId -> text. directions: "fromId>toId" -> where to go in fromId to reach toId.
+  if(c.notes&&typeof c.notes==="object")Object.entries(c.notes).forEach(([k,v])=>{const s=String(v||"").trim();if(s)out.notes[k]=s.slice(0,NOTE_MAX)});
+  // An empty string is kept on purpose: it means "I cleared the built-in directions here".
+  if(c.directions&&typeof c.directions==="object")Object.entries(c.directions).forEach(([k,v])=>{if(k.includes(">"))out.directions[k]=String(v??"").trim().slice(0,DIR_MAX)});
+  return out;
+}
+const hasCustom=c=>c.zones.length||c.connections.length||c.teleports.length||c.removedTeleports.length||Object.keys(c.gate).length;
+const hasAny=c=>hasCustom(c)||Object.keys(c.notes).length||Object.keys(c.directions).length;
+const dirKey=(a,b)=>a+">"+b;
+let builtinDirs={};
+function getDir(a,b){const k=dirKey(a,b);return k in custom.directions?custom.directions[k]:(builtinDirs[k]||"")}
+function setDir(a,b,text){const k=dirKey(a,b),s=text.trim().slice(0,DIR_MAX);
+  if(s===(builtinDirs[k]||""))delete custom.directions[k];else custom.directions[k]=s;
+  persist("custom")}
+const zoneNote=z=>(custom.notes[z]||"").trim();
+function setNote(z,text){const s=text.trim().slice(0,NOTE_MAX);if(s)custom.notes[z]=s;else delete custom.notes[z];persist("custom")}
+// Older versions kept notes on favorites only. Move them onto the zone itself.
+function migrateFavNotes(){
+  let moved=false;
+  state.favs.forEach(f=>{if(f.note){if(!custom.notes[f.z])custom.notes[f.z]=f.note.slice(0,NOTE_MAX);delete f.note;moved=true}});
+  return moved;
+}
+const connKey=x=>[x[0],x[1]].sort().join("|")+"|"+x[2];
+const portKey=t=>t.spell+"|"+t.cls;
+
+// Built-in map + your additions. Your zone with a built-in id renames it; your teleport with a built-in spell+class replaces it.
+function mergeData(base,c){
+  const zones=new Map(base.zones.map(z=>[z[0],z.slice()]));
+  c.zones.forEach(z=>zones.set(z[0],z.slice()));
+  const ids=new Set(zones.keys());
+  const connections=[...base.connections,...c.connections.map(x=>{const y=x.slice();y.mine=true;return y})].filter(x=>ids.has(x[0])&&ids.has(x[1]));
+  const tps=new Map(base.teleports.map(t=>[portKey(t),{...t,builtin:true}]));
+  c.removedTeleports.forEach(k=>tps.delete(k));
+  c.teleports.forEach(t=>{const k=portKey(t),b=base.teleports.some(x=>portKey(x)===k);tps.set(k,{...t,mine:true,builtin:b})});
+  return {zones:[...zones.values()],connections,teleports:[...tps.values()].filter(t=>ids.has(t.dest)),gate:{...base.gate,...c.gate}};
+}
+// The earlier version saved the whole map. Keep only what differs from the built-in map.
+function diffLegacy(full){
+  const out=clone(EMPTY_CUSTOM);if(!validData(full))return out;
+  const bz=new Map(DEFAULT_DATA.zones.map(z=>[z[0],z]));
+  full.zones.forEach(z=>{const b=bz.get(z[0]);if(!b||b[1]!==z[1]||b[2]!==z[2])out.zones.push(z)});
+  const bc=new Set(DEFAULT_DATA.connections.map(connKey));
+  full.connections.forEach(x=>{if(!bc.has(connKey(x)))out.connections.push(x)});
+  const bt=new Map(DEFAULT_DATA.teleports.map(t=>[portKey(t),JSON.stringify(t)]));
+  full.teleports.forEach(t=>{if(bt.get(portKey(t))!==JSON.stringify(t))out.teleports.push(t)});
+  Object.entries(full.gate).forEach(([k,v])=>{if(DEFAULT_DATA.gate[k]!==v)out.gate[k]=v});
+  return normalizeCustom(out);
+}
+
+let custom=lsGet(":custom",null);
+custom=custom?normalizeCustom(custom):diffLegacy(lsGet(":data",null));
+let data=mergeData(DEFAULT_DATA,custom);
+let state=normalizeState(lsGet(":state",null));
+if(migrateFavNotes()){lsSet(":state",state);lsSet(":custom",custom)}
+
+const cloud={state:null,custom:null};
+const dirty=new Set(); let saveTimer=null, flushing=false;
+const lastSent={state:null,custom:null};
+
+function setSaved(kind,text){const el=$("saved");el.dataset.s=kind;el.textContent=text}
+function persist(kind){
+  if(kind==="state")lsSet(":state",state); else lsSet(":custom",custom);
+  if(!cloud.state)return;
+  dirty.add(kind);clearTimeout(saveTimer);saveTimer=setTimeout(flush,700);
+}
+async function flush(){
+  if(flushing){saveTimer=setTimeout(flush,400);return}
+  flushing=true;
+  const kinds=[...dirty];dirty.clear();
+  let failed=null;
+  for(const k of kinds){
+    const body=k==="state"?{state:clone(state)}:{custom:clone(custom)};
+    const json=JSON.stringify(body);
+    if(json===lastSent[k])continue;
+    setSaved("saving","Saving…");
+    try{await cloud[k].set(body);lastSent[k]=json}
+    catch(e){
+      if(e&&e.code==="unavailable"){try{await new Promise(r=>setTimeout(r,800+Math.random()*800));await cloud[k].set(body);lastSent[k]=json;continue}catch(e2){failed=e2}}
+      else failed=e;
+    }
+  }
+  flushing=false;
+  if(!failed){setSaved("cloud","Saved to your Claude account");return}
+  if(["invalid_argument","revoked","not_granted","capability_disabled","capability_removed"].includes(failed.code)){
+    cloud.state=cloud.custom=null;setSaved("local","Saved in this browser only");
+  }else if(failed.code==="quota_exceeded"){setSaved("error","Account storage is full. Changes are kept in this browser.")}
+  else setSaved("error","Couldn't reach your account. Changes are kept in this browser.");
+}
+
+async function initCloud(){
+  if(!window.claude||typeof window.claude.use!=="function")return;
+  try{
+    const [db,user]=await Promise.all([window.claude.use("db"),window.claude.use("user")]);
+    if(!db||!user)return;
+    const uid=await user.id();
+    if(!uid)return;
+    const base="data/users/"+uid;
+    const sRef=db.doc(base+"/settings"), cRef=db.doc(base+"/custom"), legacyRef=db.doc(base+"/mapdata");
+    const [sSnap,cSnap,lSnap]=await Promise.all([sRef.get(),cRef.get(),legacyRef.get()]);
+    cloud.state=sRef;cloud.custom=cRef;
+    if(cSnap.exists&&cSnap.data().custom){custom=normalizeCustom(cSnap.data().custom);lsSet(":custom",custom);lastSent.custom=JSON.stringify({custom})}
+    else if(lSnap.exists&&lSnap.data().data){const legacy=diffLegacy(lSnap.data().data);if(hasCustom(legacy))custom={...legacy,notes:custom.notes,directions:custom.directions};dirty.add("custom")}
+    else if(hasAny(custom))dirty.add("custom");
+    if(sSnap.exists&&sSnap.data().state){state=normalizeState(sSnap.data().state);lsSet(":state",state);lastSent.state=JSON.stringify({state})}
+    else dirty.add("state");
+    if(migrateFavNotes()){dirty.add("state");dirty.add("custom");lsSet(":state",state);lsSet(":custom",custom)}
+    rebuild();refresh(false);
+    setSaved("cloud","Saved to your Claude account");
+    if(dirty.size)flush();
+  }catch(e){setSaved("local","Saved in this browser only")}
+}
+
+/* ---------- Helpers ---------- */
+const $=id=>document.getElementById(id);
+function esc(s){return String(s).replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]))}
+let zoneName={}, zoneCont={}, zoneList=[], customIds=new Set();
+function rebuild(){
+  data=mergeData(DEFAULT_DATA,custom);
+  customIds=new Set(custom.zones.map(z=>z[0]));
+  // A link's entrance note doubles as its starting directions.
+  builtinDirs={};
+  data.connections.forEach(c=>{const o=c[3]||{};if(!o.note)return;
+    builtinDirs[dirKey(c[0],c[1])]=o.note;
+    if(!o.oneway&&!builtinDirs[dirKey(c[1],c[0])])builtinDirs[dirKey(c[1],c[0])]=o.note;});
+  zoneName={};zoneCont={};
+  zoneList=data.zones.map(z=>{zoneName[z[0]]=z[1];zoneCont[z[0]]=z[2];return {id:z[0],name:z[1],cont:z[2],al:(ALIASES[z[0]]||[]).concat(z[3]||[])}})
+    .sort((a,b)=>a.cont.localeCompare(b.cont)||a.name.localeCompare(b.name));
+  ["from","to","bind"].forEach(k=>{if(!zoneName[state[k]])state[k]=data.zones[0][0]});
+  ["ncA","ncB","ntDest"].forEach(k=>{if(form[k]&&!zoneName[form[k]])form[k]=null});
+  if(!zoneName[guide.zone])guide.zone=state.to;
+  form.links=form.links.filter(l=>zoneName[l.z]);
+  $("contList").innerHTML=[...new Set(zoneList.map(z=>z.cont))].map(c=>`<option value="${esc(c)}">`).join("");
+  showData();
+}
+const isFav=z=>state.favs.some(f=>f.z===z);
+function charLevel(){const me=state.casters.filter(c=>c.who==="me");return me.length?Math.max(...me.map(c=>+c.level)):Infinity}
+
+/* ---------- Zone search ---------- */
+function normWithMap(s){let n="",map=[];for(let i=0;i<s.length;i++){const ch=s[i];if(/['’\-]/.test(ch))continue;n+=ch.toLowerCase();map.push(i)}return {n,map}}
+const norm=s=>s.toLowerCase().replace(/['’\-]/g,"");
+function searchZones(q){
+  const terms=norm(q).trim().split(/\s+/).filter(Boolean);
+  const favSet=new Set(state.favs.map(f=>f.z));
+  const scored=[];
+  zoneList.forEach(z=>{
+    const nm=norm(z.name), hay=nm+" "+norm(z.cont), al=z.al.map(norm);
+    let score=3;
+    if(terms.length){
+      const ok=terms.every(t=>hay.includes(t)||al.some(a=>a.startsWith(t))||z.id.startsWith(t));
+      if(!ok)return;
+      const q0=terms.join(" ");
+      if(al.includes(q0)||z.id===q0)score=0;
+      else if(nm.startsWith(q0))score=1;
+      else if(nm.split(/\s+/).some(w=>w.startsWith(terms[0])))score=2;
+    }
+    scored.push({...z,fav:favSet.has(z.id),score,terms});
+  });
+  const favs=scored.filter(z=>z.fav).sort((a,b)=>a.score-b.score||a.name.localeCompare(b.name)).map(z=>({...z,group:"Favorites"}));
+  let rest=scored.filter(z=>!z.fav);
+  if(terms.length)rest=rest.sort((a,b)=>a.score-b.score||a.name.localeCompare(b.name)).map(z=>({...z,group:"Zones"}));
+  else rest=rest.map(z=>({...z,group:z.cont}));
+  return [...favs,...rest];
+}
+function highlight(name,terms){
+  if(!terms.length)return esc(name);
+  const {n,map}=normWithMap(name);const marks=new Array(name.length).fill(false);
+  terms.forEach(t=>{const i=n.indexOf(t);if(i<0)return;for(let k=i;k<i+t.length;k++)marks[map[k]]=true});
+  let out="",open=false;
+  for(let i=0;i<name.length;i++){
+    if(marks[i]&&!open){out+="<mark>";open=true}
+    if(!marks[i]&&open){out+="</mark>";open=false}
+    out+=esc(name[i]);
+  }
+  return out+(open?"</mark>":"");
+}
+
+const combos={};
+function makeCombo(id,{value,onPick,keepText=true}){
+  const input=$(id), list=$(id+"-list");
+  let items=[], active=-1;
+  const shown=()=>keepText?(zoneName[value()]||""):"";
+  function setActive(i){
+    active=i;
+    list.querySelectorAll("[role=option]").forEach(li=>li.setAttribute("aria-selected",+li.dataset.i===i));
+    const el=$(id+"-opt-"+i);
+    if(el){input.setAttribute("aria-activedescendant",el.id);el.scrollIntoView({block:"nearest"})}
+    else input.removeAttribute("aria-activedescendant");
+  }
+  function open(q){
+    items=searchZones(q);
+    let html="",grp=null;
+    items.forEach((z,i)=>{
+      if(z.group!==grp){grp=z.group;html+=`<li class="grp" role="presentation">${esc(grp)}</li>`}
+      const nt=zoneNote(z.id);
+      const extra=nt?(nt.length>40?nt.slice(0,38)+"…":nt):customIds.has(z.id)?"Added by you":(z.group==="Favorites"||z.group==="Zones"?z.cont:"");
+      html+=`<li role="option" id="${id}-opt-${i}" data-i="${i}" aria-selected="false"><span>${z.fav?"★ ":""}${highlight(z.name,z.terms)}</span>${extra?`<small>${esc(extra)}</small>`:""}</li>`;
+    });
+    list.innerHTML=html||`<li class="none" role="presentation">No zone matches "${esc(q)}". Try fewer letters, or add it in Add locations.</li>`;
+    list.hidden=false;input.setAttribute("aria-expanded","true");
+    const cur=items.findIndex(z=>z.id===value());
+    setActive(items.length?(q.trim()||cur<0?0:cur):-1);
+  }
+  function close(){list.hidden=true;input.setAttribute("aria-expanded","false");input.removeAttribute("aria-activedescendant");active=-1}
+  function choose(i){const z=items[i];if(!z)return;close();onPick(z.id);input.value=shown()}
+  input.addEventListener("focus",()=>{input.select();open("")});
+  input.addEventListener("click",()=>{if(list.hidden)open("")});
+  input.addEventListener("input",()=>open(input.value));
+  input.addEventListener("keydown",e=>{
+    if(e.key==="ArrowDown"||e.key==="ArrowUp"){
+      e.preventDefault();
+      if(list.hidden){open("");return}
+      if(!items.length)return;
+      setActive((active+(e.key==="ArrowDown"?1:-1)+items.length)%items.length);
+    }else if(e.key==="Enter"){
+      if(!list.hidden&&active>=0){e.preventDefault();choose(active)}
+      else if(list.hidden)e.preventDefault();
+    }else if(e.key==="Escape"){
+      if(!list.hidden){e.preventDefault();input.value=shown();close();input.select()}
+    }else if(e.key==="Tab"){
+      if(!list.hidden&&active>=0&&input.value.trim()&&input.value!==shown())choose(active);else close();
+    }
+  });
+  input.addEventListener("blur",()=>setTimeout(()=>{if(document.activeElement!==input){close();input.value=shown()}},0));
+  list.addEventListener("mousedown",e=>e.preventDefault());
+  list.addEventListener("click",e=>{const li=e.target.closest("[role=option]");if(li)choose(+li.dataset.i)});
+  combos[id]={sync(){if(document.activeElement!==input)input.value=shown()}};
+}
+
+/* ---------- Rendering ---------- */
+function renderStars(){
+  ["from","to","bind"].forEach(k=>{
+    const b=$(k+"-star"),on=isFav(state[k]),nm=zoneName[state[k]]||"this zone";
+    b.setAttribute("aria-pressed",on);b.textContent=on?"★":"☆";
+    b.title=on?`Remove ${nm} from favorites`:`Add ${nm} to favorites`;b.setAttribute("aria-label",b.title);
+  });
+}
+
+function renderFavs(){
+  const el=$("favs");
+  if(!state.favs.length){el.innerHTML=`<li class="fav-empty">Star a zone in any field above, or search here, to keep it handy. To leave a note on a zone without starring it, use the Zone guide tab.</li>`;return}
+  el.innerHTML=state.favs.map((f,i)=>{
+    const nm=zoneName[f.z];
+    if(!nm)return `<li class="fav"><div class="fav-head"><span class="fav-name">${esc(f.z)}</span><span class="fav-cont warn">No longer on the map</span></div><div class="fav-actions"><button class="btn small rm" data-act="rm" data-i="${i}">Remove</button></div></li>`;
+    const here=[state.from===f.z?"start":"",state.to===f.z?"destination":"",state.bind===f.z?"bind point":""].filter(Boolean);
+    return `<li class="fav">
+      <div class="fav-head"><span class="fav-name">${esc(nm)}</span><span class="fav-cont">${esc(here.length?"Your "+here.join(", "):zoneCont[f.z])}</span></div>
+      <input type="text" id="fav-note-${esc(f.z)}" data-note="${esc(f.z)}" value="${esc(zoneNote(f.z))}" placeholder="Add a note" aria-label="Note for ${esc(nm)}" maxlength="${NOTE_MAX}">
+      <div class="fav-actions">
+        <button class="btn small" data-act="from" data-i="${i}">Start here</button>
+        <button class="btn small" data-act="to" data-i="${i}">Travel here</button>
+        <button class="btn small" data-act="bind" data-i="${i}">Set as bind</button>
+        <button class="btn small rm" data-act="rm" data-i="${i}" aria-label="Remove ${esc(nm)} from favorites">Remove</button>
+      </div></li>`;
+  }).join("");
+}
+
+function renderCasters(){
+  const meCount=state.casters.filter(c=>c.who==="me").length;
+  $("casters").innerHTML=state.casters.map((c,i)=>`
+   <div class="caster">
+    <select id="c-who-${i}" data-i="${i}" data-k="who" aria-label="Whose class"><option value="me"${c.who==="me"?" selected":""}>Me</option><option value="friend"${c.who==="friend"?" selected":""}>Friend</option></select>
+    <select id="c-cls-${i}" data-i="${i}" data-k="cls" aria-label="Class">${CLASSES.map(k=>`<option${k===c.cls?" selected":""}>${k}</option>`).join("")}</select>
+    <input id="c-lvl-${i}" type="number" min="1" max="70" data-i="${i}" data-k="level" value="${c.level}" aria-label="Level">
+    <button class="btn small" data-rm="${i}" aria-label="Remove ${esc(c.cls)}">✕</button>
+   </div>`).join("")||`<p class="hint">No casters yet. Add your classes to unlock teleports.</p>`;
+  $("casterHint").innerHTML=meCount>3
+   ?`<span class="warn">EverQuest Legends lets a character pick up to three classes. You have ${meCount} marked as yours.</span>`
+   :"Your own classes can use self-only spells like Gate. A friend's class only counts for group teleports. Your highest class level is used for zone level requirements.";
+}
+
+const hasReagent=t=>!t.reagent||!!state.reagents[reagentKey(t.reagent)];
+function usablePorts(ignoreReagents=false){
+  const out=[];
+  data.teleports.forEach(t=>{
+    if(!ignoreReagents&&!hasReagent(t))return;
+    const caster=state.casters.find(c=>c.cls===t.cls&&+c.level>=t.level&&(c.who==="me"||t.group));
+    if(caster&&zoneName[t.dest])out.push({...t,by:caster.who});
+  });
+  const gateBy=state.casters.find(c=>c.who==="me"&&data.gate[c.cls]!=null&&+c.level>=data.gate[c.cls]);
+  if(gateBy&&zoneName[state.bind])out.push({spell:"Gate",cls:gateBy.cls,level:data.gate[gateBy.cls],dest:state.bind,group:false,by:"me",isGate:true});
+  return out;
+}
+
+function findRoute(ignoreLevel=false,ignoreReagents=false){
+  const w=state.w, adj={}, lvl=ignoreLevel?Infinity:charLevel();
+  data.zones.forEach(z=>adj[z[0]]=[]);
+  data.connections.forEach(c=>{
+    const [a,b,t]=c, o=c[3]||{};
+    if(!adj[a]||!adj[b])return;
+    if(o.minLevel&&lvl<o.minLevel)return;
+    const kind=t==="boat"?"boat":t==="portal"?"portal":"zone";
+    const cost=kind==="boat"?+w.boat:kind==="portal"?+w.port:+w.zone;
+    adj[a].push({to:b,cost,kind,o});
+    if(!o.oneway)adj[b].push({to:a,cost,kind,o});
+  });
+  const ports=usablePorts(ignoreReagents);
+  const dist={},prev={},done=new Set();
+  Object.keys(adj).forEach(k=>dist[k]=Infinity);
+  if(!(state.from in dist))return null;
+  dist[state.from]=0;
+  while(true){
+    let u=null,best=Infinity;
+    for(const k in dist)if(!done.has(k)&&dist[k]<best){best=dist[k];u=k}
+    if(u===null||u===state.to)break;
+    done.add(u);
+    const relax=(v,cost,info)=>{if(dist[u]+cost<dist[v]-1e-9){dist[v]=dist[u]+cost;prev[v]={from:u,...info}}};
+    adj[u].forEach(e=>relax(e.to,e.cost,{kind:e.kind,o:e.o}));
+    // Succor/Evacuate can leave people behind, so a regular portal to the same place wins a tie.
+    ports.forEach(p=>{if(p.dest!==u)relax(p.dest,+w.port+(p.evac?0.25:0),{kind:p.isGate?"gate":"spell",port:p})});
+  }
+  if(dist[state.to]===Infinity)return null;
+  const steps=[];let cur=state.to;
+  while(cur!==state.from){const p=prev[cur];steps.unshift({zone:cur,...p});cur=p.from}
+  return {steps,cost:dist[state.to]};
+}
+
+let editingStep=null; // which route step has its editor open, e.g. "oasis>hate" or "@southqeynos"
+function stepExtras(zone,fromZone,physical){
+  const key=physical?dirKey(fromZone,zone):"@"+zone;
+  const dir=physical?getDir(fromZone,zone):"";
+  const note=zoneNote(zone), open=editingStep===key;
+  let h="";
+  if(dir)h+=`<div class="step-dir"><span>In ${esc(zoneName[fromZone])}:</span> ${esc(dir)}</div>`;
+  if(note)h+=`<div class="step-note">${esc(note)}</div>`;
+  if(isFav(zone))h+=`<div class="step-fav">★ Favorite</div>`;
+  const label=physical?(dir||note?"Edit directions and note":"Add directions or a note"):(note?"Edit note":"Add a note");
+  h+=`<button class="step-edit" data-edit="${esc(key)}" aria-expanded="${open}">${open?"Close":label}</button>`;
+  if(open){
+    const id=key.replace(/[^a-z0-9]/gi,"_");
+    h+=`<div class="editor">`;
+    if(physical)h+=`<label for="d_${id}">Where to go in ${esc(zoneName[fromZone])} to reach ${esc(zoneName[zone])}</label>
+      <textarea id="d_${id}" rows="2" maxlength="${DIR_MAX}" data-dir="${esc(key)}" placeholder="Head north along the road; the zone line is past the guard tower">${esc(dir)}</textarea>`;
+    h+=`<label for="n_${id}">Notes about ${esc(zoneName[zone])}</label>
+      <textarea id="n_${id}" rows="2" maxlength="${NOTE_MAX}" data-znote="${esc(zone)}" placeholder="Bank, bind spot, named camps, quest NPCs">${esc(note)}</textarea>
+      <div class="row" style="margin-top:4px"><button class="btn small" data-edit="${esc(key)}">Done</button></div></div>`;
+  }
+  return h;
+}
+const lvlTag=o=>o&&o.minLevel?` <b>(level ${o.minLevel}+)</b>`:"";
+
+// Steps animate in only when the route itself changes, not when you open a note editor.
+function renderRoute(animate=false){
+  const el=$("route"), sum=$("summary");
+  el.classList.toggle("still",!animate);
+  $("reagentTip").innerHTML="";
+  if(state.from===state.to){sum.innerHTML="";el.innerHTML=`<p class="empty">You're already in ${esc(zoneName[state.to])}. Pick a different destination.</p>`;return}
+  const r=findRoute();
+  // Would a reagent you don't have make this trip possible or shorter?
+  const withAll=findRoute(false,true);
+  if(withAll&&(!r||withAll.cost<r.cost-1e-9)){
+    const missing=[...new Set(withAll.steps.filter(s=>s.port&&!hasReagent(s.port)).map(s=>s.port.reagent))];
+    if(missing.length){
+      const names=missing.map(m=>`a ${esc(m)}`).join(" and ");
+      $("reagentTip").innerHTML=`<div class="tip">${r?`With ${names}, this trip takes ${withAll.steps.length} step${withAll.steps.length===1?"":"s"} instead of ${r.steps.length}.`:`This trip needs ${names}.`}
+        ${missing.map(m=>`<button type="button" data-have="${esc(reagentKey(m))}">I have ${esc(m)}</button>`).join(" ")}</div>`;
+    }
+  }
+  if(!r){
+    sum.innerHTML="";
+    const gated=findRoute(true);
+    if(gated){
+      const need=Math.max(...gated.steps.filter(s=>s.o&&s.o.minLevel).map(s=>s.o.minLevel),0);
+      el.innerHTML=`<p class="empty">${esc(zoneName[state.to])} needs level ${need} to enter, and your highest class is level ${charLevel()}. Raise a class level above to see the route.</p>`;
+    }else if(withAll)el.innerHTML=`<p class="empty">The only way to ${esc(zoneName[state.to])} with your current casters uses a reagent you haven't marked as on hand.</p>`;
+    else el.innerHTML=`<p class="empty">No route connects ${esc(zoneName[state.from])} to ${esc(zoneName[state.to])}. Link it to a neighboring zone in Add locations, or add a teleport that lands there.</p>`;
+    return;
+  }
+  const n=k=>r.steps.filter(s=>s.kind===k).length;
+  sum.innerHTML=`<div><strong>${r.steps.length}</strong> steps</div><div><strong>${n("zone")}</strong> zone lines</div><div><strong>${n("boat")}</strong> boat legs</div><div><strong>${n("portal")}</strong> portals</div><div><strong>${n("spell")+n("gate")}</strong> teleports</div>`;
+  const zbtn=z=>`<button data-guide="${esc(z)}" title="Open in Zone guide">${esc(zoneName[z])}</button>`;
+  const items=[`<li class="start"><span class="node" aria-hidden="true">◆</span><div class="step-zone">${zbtn(state.from)}</div><div class="step-how">Start here</div>${stepExtras(state.from,null,false)}</li>`];
+  r.steps.forEach((s,i)=>{
+    const last=i===r.steps.length-1;let cls=s.kind,icon="›",how="";
+    const physical=["zone","boat","portal"].includes(s.kind);
+    if(s.kind==="zone"){how=`Run through the zone line from ${esc(zoneName[s.from])}${lvlTag(s.o)}`}
+    if(s.kind==="boat"){icon="≈";how=`Take the boat from ${esc(zoneName[s.from])}${lvlTag(s.o)}`}
+    if(s.kind==="portal"){icon="◎";how=`Take the portal in ${esc(zoneName[s.from])}${lvlTag(s.o)}${s.o&&s.o.oneway?", one way":""}`}
+    if(s.kind==="spell"){const p=s.port;icon="✦";cls+=" "+p.cls.toLowerCase();
+      how=`Cast <b>${esc(p.spell)}</b> (${esc(p.cls)} ${p.level}${p.by==="friend"?", ask your friend":""})${p.reagent?`, uses a ${esc(p.reagent)}`:""}${p.evac?". Fast to cast, but it can leave group members behind":""}`}
+    if(s.kind==="gate"){icon="⟲";how=`Cast <b>Gate</b> (${esc(s.port.cls)} ${s.port.level}) to return to your bind point`}
+    items.push(`<li class="${cls}${last?" end":""}" style="animation-delay:${Math.min(i*30,400)}ms"><span class="node" aria-hidden="true">${last?"⚑":icon}</span><div class="step-zone">${zbtn(s.zone)}</div><div class="step-how">${how}</div>${stepExtras(s.zone,s.from,physical)}</li>`);
+  });
+  el.innerHTML=items.join("");
+}
+
+function renderPorts(){
+  const usable=new Set(usablePorts().filter(p=>!p.isGate).map(portKey));
+  const rows=data.teleports.slice().sort((a,b)=>a.cls.localeCompare(b.cls)||a.level-b.level||a.spell.localeCompare(b.spell));
+  const gateRows=Object.entries(data.gate).map(([c,l])=>({spell:"Gate",cls:c,level:l,dest:null,group:false}));
+  $("portRows").innerHTML=[...rows,...gateRows].map(t=>{
+    const isGate=t.spell==="Gate"&&!t.dest, k=portKey(t), editing=portEdit===k;
+    const on=isGate?state.casters.some(c=>c.who==="me"&&c.cls===t.cls&&+c.level>=t.level):usable.has(k);
+    const tag=t.mine&&t.builtin?`<span class="tag">edited</span>`:t.mine?`<span class="tag">yours</span>`:"";
+    const reag=t.reagent?`${esc(t.reagent)}${hasReagent(t)?"":` <span class="tag miss">not on hand</span>`}`:"";
+    let acts="";
+    if(!isGate){
+      acts=`<button type="button" class="btn small" data-pedit="${esc(k)}"${editing?' aria-pressed="true"':""}>Edit</button>`;
+      if(t.mine&&t.builtin)acts+=`<button type="button" class="btn small" data-preset="${esc(k)}" title="Go back to the built-in version">Reset</button>`;
+      acts+=`<button type="button" class="btn small danger" data-premove="${esc(k)}" aria-label="Remove ${esc(t.spell)}">Remove</button>`;
+    }
+    return `<tr class="${on?"":"off"}"><td>${esc(t.spell)}${tag}</td><td>${esc(t.cls)}</td><td>${t.level}</td><td>${t.dest?esc(zoneName[t.dest]||t.dest)+(isFav(t.dest)?" ★":""):"Your bind point"}</td><td>${t.group?"Group":"Self only"}${t.evac?", evac":""}</td><td>${reag}</td><td class="acts">${acts}</td></tr>`}).join("");
+  const removed=custom.removedTeleports.map(k=>DEFAULT_DATA.teleports.find(t=>portKey(t)===k)).filter(Boolean);
+  $("removedWrap").hidden=!removed.length;
+  $("removedSummary").textContent=`Removed built-in spells (${removed.length})`;
+  $("removedList").innerHTML=removed.map(t=>`<li><span>${esc(t.spell)} <small>${esc(t.cls)} ${t.level}, lands in ${esc(zoneName[t.dest]||t.dest)}</small></span><button type="button" class="btn small" data-prestore="${esc(portKey(t))}">Restore</button></li>`).join("");
+}
+
+// Reagents for teleports someone in your list could cast at their level.
+function renderReagents(){
+  const seen=new Map();
+  data.teleports.forEach(t=>{
+    if(!t.reagent)return;
+    const castable=state.casters.some(c=>c.cls===t.cls&&+c.level>=t.level&&(c.who==="me"||t.group));
+    if(!castable)return;
+    const k=reagentKey(t.reagent);
+    if(!seen.has(k))seen.set(k,{name:t.reagent,spells:[]});
+    seen.get(k).spells.push(t.spell);
+  });
+  $("reagentWrap").hidden=!seen.size;
+  $("reagents").innerHTML=[...seen].map(([k,r],i)=>`<label class="reagent" for="rg-${i}"><input type="checkbox" id="rg-${i}" data-reagent="${esc(k)}"${state.reagents[k]?" checked":""}><span>${esc(r.name)}<small>For ${esc(r.spells.join(", "))}</small></span></label>`).join("");
+}
+
+/* ---------- Teleport add / edit / remove ---------- */
+let portEdit=null; // key of the teleport loaded into the form, or null when adding
+function fillPortForm(t){
+  $("ntSpell").value=t?t.spell:"";$("ntCls").value=t?t.cls:"Wizard";$("ntLvl").value=t?t.level:24;
+  $("ntGroup").value=t&&!t.group?"self":"group";$("ntKind").value=t&&t.evac?"evac":"port";
+  $("ntReagent").value=t&&t.reagent?t.reagent:"";form.ntDest=t?t.dest:null;combos.ntDest.sync();
+  $("portFormTitle").textContent=t?`Edit ${t.spell}`:"Add a teleport";
+  $("portSubmit").textContent=t?"Save changes":"Add teleport";
+  $("portCancel").hidden=!t;$("portForm").classList.toggle("editing",!!t);
+}
+function removeTeleport(k){
+  custom.teleports=custom.teleports.filter(t=>portKey(t)!==k);
+  if(DEFAULT_DATA.teleports.some(t=>portKey(t)===k)&&!custom.removedTeleports.includes(k))custom.removedTeleports.push(k);
+}
+function restoreTeleport(k){custom.removedTeleports=custom.removedTeleports.filter(x=>x!==k)}
+
+/* ---------- Zone guide ---------- */
+const guide={zone:null};
+function linksOf(z){
+  const out=[],inn=[];
+  data.connections.forEach(c=>{const o=c[3]||{};
+    if(c[0]===z)out.push({nb:c[1],t:c[2],o});
+    if(c[1]===z&&!o.oneway)out.push({nb:c[0],t:c[2],o:{...o,minLevel:undefined}});
+    if(c[1]===z)inn.push({nb:c[0],t:c[2],o});
+    if(c[0]===z&&!o.oneway)inn.push({nb:c[1],t:c[2],o:{...o,minLevel:undefined}});
+  });
+  const byName=(a,b)=>(zoneName[a.nb]||"").localeCompare(zoneName[b.nb]||"");
+  return {out:out.sort(byName),inn:inn.sort(byName)};
+}
+function linkMeta(l){return [TRAVEL_LABEL[l.t]||l.t,l.o.oneway?"one way":"",l.o.minLevel?`level ${l.o.minLevel}+`:""].filter(Boolean).join(", ")}
+function renderGuide(){
+  const z=guide.zone, el=$("guide");
+  if(!zoneName[z]){el.innerHTML="";return}
+  const nm=zoneName[z], {out,inn}=linksOf(z), fav=isFav(z);
+  const lands=data.teleports.filter(t=>t.dest===z);
+  const dirBox=(a,b,label)=>{const id="g_"+dirKey(a,b).replace(/[^a-z0-9]/gi,"_");
+    return `<label class="f" for="${id}" style="margin-top:0">${label}</label><textarea id="${id}" rows="2" maxlength="${DIR_MAX}" data-dir="${esc(dirKey(a,b))}" placeholder="Not written yet">${esc(getDir(a,b))}</textarea>`};
+  const exit=(l,a,b,label)=>`<li><div class="exit-head"><button data-guide="${esc(l.nb)}">${esc(zoneName[l.nb])}</button><small>${esc(linkMeta(l))}</small></div>${dirBox(a,b,label)}</li>`;
+  el.innerHTML=`
+   <div class="guide-head"><h3>${esc(nm)}</h3><small>${esc(zoneCont[z])}${customIds.has(z)?", added by you":""}</small></div>
+   <div class="row" style="margin-top:0">
+     <button class="btn small" data-gact="fav" aria-pressed="${fav}">${fav?"★ Favorite":"☆ Add to favorites"}</button>
+     <button class="btn small" data-gact="from">Start here</button>
+     <button class="btn small" data-gact="to">Travel here</button>
+     <button class="btn small" data-gact="bind">Set as bind</button>
+   </div>
+   <div><h4>Notes</h4><textarea id="guideNote" rows="3" maxlength="${NOTE_MAX}" data-znote="${esc(z)}" aria-label="Notes about ${esc(nm)}" placeholder="Bank, bind spot, named camps, quest NPCs, anything you want to remember">${esc(zoneNote(z))}</textarea></div>
+   <div><h4>Leaving ${esc(nm)}</h4>${out.length?`<ul class="exits">${out.map(l=>exit(l,z,l.nb,`Where to go in ${esc(nm)}`)).join("")}</ul>`:`<p class="hint" style="margin:0">No exits on the map. Leave with Gate or a teleport, or add a link in Add locations.</p>`}</div>
+   <div><h4>Getting here</h4>${inn.length?`<ul class="exits">${inn.map(l=>exit(l,l.nb,z,`Where to go in ${esc(zoneName[l.nb])}`)).join("")}</ul>`:`<p class="hint" style="margin:0">No zone leads here. Only teleports reach it.</p>`}</div>
+   ${lands.length?`<div><h4>Teleports that land here</h4><ul class="mine">${lands.map(t=>`<li><span>${esc(t.spell)} <small>${esc(t.cls)} ${t.level}, ${t.group?"group":"self only"}${t.reagent?", uses "+esc(t.reagent):""}</small></span></li>`).join("")}</ul></div>`:""}`;
+}
+function selectTab(name){
+  document.querySelectorAll(".tab").forEach(x=>x.setAttribute("aria-selected",x.dataset.tab===name));
+  ["route","guide","ports","add"].forEach(n=>$("tab-"+n).hidden=n!==name);
+}
+function openGuide(z){guide.zone=z;combos.guideZone.sync();renderGuide();selectTab("guide");$("t-guide").scrollIntoView({block:"nearest"})}
+
+// Typing in any directions or notes box saves right away; the rest of the page catches up when you leave the box.
+function onNoteInput(e){
+  const d=e.target.dataset.dir, n=e.target.dataset.znote;
+  if(d!=null){const [a,b]=d.split(">");setDir(a,b,e.target.value)}
+  else if(n!=null)setNote(n,e.target.value);
+}
+$("guide").addEventListener("input",onNoteInput);
+$("guide").addEventListener("focusout",e=>{if(e.target.matches("textarea")){renderRoute();renderFavs()}});
+$("guide").addEventListener("click",e=>{
+  const g=e.target.closest("[data-guide]");if(g){openGuide(g.dataset.guide);return}
+  const a=e.target.closest("[data-gact]");if(!a)return;
+  const z=guide.zone;
+  if(a.dataset.gact==="fav"){toggleFav(z);return}
+  state[a.dataset.gact]=z;refresh();
+});
+$("route").addEventListener("input",onNoteInput);
+$("route").addEventListener("click",e=>{
+  const g=e.target.closest("[data-guide]");if(g){openGuide(g.dataset.guide);return}
+  const ed=e.target.closest("[data-edit]");if(!ed)return;
+  const key=ed.dataset.edit;editingStep=editingStep===key?null:key;
+  renderRoute();
+  const box=editingStep&&$("route").querySelector(".editor textarea");
+  if(box)box.focus();else $("route").querySelector(`[data-edit="${CSS.escape(key)}"]`)?.focus();
+});
+
+/* ---------- Add locations ---------- */
+const form={links:[],ncA:null,ncB:null,ntDest:null};
+const LINK_TYPES=[["zone","Zone line"],["boat","Boat"],["portal","Portal, both ways"],["portal-in","Portal into new zone"],["portal-out","Portal out of new zone"]];
+function renderLinks(){
+  $("nzLinks").innerHTML=form.links.map((l,i)=>`<li><span>${esc(zoneName[l.z])}</span>
+    <select id="nzLinkType-${i}" data-link="${i}" aria-label="How ${esc(zoneName[l.z])} connects">${LINK_TYPES.map(([v,t])=>`<option value="${v}"${v===l.type?" selected":""}>${t}</option>`).join("")}</select>
+    <button type="button" class="btn small" data-unlink="${i}" aria-label="Remove ${esc(zoneName[l.z])}">✕</button></li>`).join("");
+}
+function linkDesc(x){
+  const o=x[3]||{}, a=zoneName[x[0]]||x[0], b=zoneName[x[1]]||x[1];
+  return `${esc(a)} ${o.oneway?"→":"↔"} ${esc(b)} <small>${TRAVEL_LABEL[x[2]]||x[2]}${o.minLevel?`, level ${o.minLevel}+`:""}${o.note?`, ${esc(o.note)}`:""}</small>`;
+}
+function renderMine(){
+  const z=custom.zones, c=custom.connections, t=custom.teleports;
+  const nN=Object.keys(custom.notes).length, nD=Object.values(custom.directions).filter(Boolean).length;
+  const notesLine=nN||nD?`<p class="hint">You've also written ${nN} zone note${nN===1?"":"s"} and ${nD} set${nD===1?"":"s"} of directions. Edit them in the Zone guide.</p>`:"";
+  if(!hasCustom(custom)){$("mine").innerHTML=`<p class="hint">Nothing added yet. Zones, links and teleports you add above show up here, where you can remove them.</p>`+notesLine;return}
+  let h=notesLine;
+  if(z.length)h+=`<p class="mine-h">Zones</p><ul class="mine">${z.map((x,i)=>`<li><span>${esc(x[1])} <small>${esc(x[2])}${DEFAULT_DATA.zones.some(b=>b[0]===x[0])?", renames a built-in zone":""}</small></span><button type="button" class="btn small" data-del="zones" data-i="${i}">Remove</button></li>`).join("")}</ul>`;
+  if(c.length)h+=`<p class="mine-h">Links</p><ul class="mine">${c.map((x,i)=>`<li><span>${linkDesc(x)}</span><button type="button" class="btn small" data-del="connections" data-i="${i}">Remove</button></li>`).join("")}</ul>`;
+  if(t.length)h+=`<p class="mine-h">Teleports</p><ul class="mine">${t.map((x,i)=>`<li><span>${esc(x.spell)} <small>${esc(x.cls)} ${x.level}, lands in ${esc(zoneName[x.dest]||x.dest)}${DEFAULT_DATA.teleports.some(b=>portKey(b)===portKey(x))?", replaces built-in":""}</small></span><button type="button" class="btn small" data-del="teleports" data-i="${i}">Remove</button></li>`).join("")}</ul>`;
+  $("mine").innerHTML=h;
+}
+function saveCustom(){persist("custom");rebuild();refresh()}
+function msg(id,text,bad){$(id).innerHTML=bad?`<span class="warn">${esc(text)}</span>`:esc(text)}
+function newId(name){
+  const slug=name.toLowerCase().replace(/[^a-z0-9]+/g,"-").replace(/^-|-$/g,"").slice(0,40)||"zone";
+  let id="my-"+slug,n=2;while(zoneName[id])id=`my-${slug}-${n++}`;return id;
+}
+
+$("zoneForm").addEventListener("submit",e=>{
+  e.preventDefault();
+  const name=$("nzName").value.trim(), cont=$("nzCont").value.trim()||"Other";
+  if(!name){msg("zoneMsg","Give the zone a name.",true);$("nzName").focus();return}
+  if(zoneList.some(z=>norm(z.name)===norm(name))){msg("zoneMsg",`${name} is already on the map. Use Link two zones to connect it differently.`,true);return}
+  const id=newId(name), lvl=+$("nzLvl").value||0, note=$("nzNote").value.trim();
+  const aliases=$("nzAlias").value.split(",").map(s=>s.trim()).filter(Boolean).slice(0,8);
+  custom.zones.push([id,name,cont,aliases]);
+  form.links.forEach(l=>{
+    const intoOpts=()=>{const o={};if(lvl)o.minLevel=lvl;if(note)o.note=note;return o};
+    let conn;
+    if(l.type==="portal-in")conn=[l.z,id,"portal",{oneway:true,...intoOpts()}];
+    else if(l.type==="portal-out")conn=[id,l.z,"portal",{oneway:true}];
+    else{const o=intoOpts();conn=Object.keys(o).length?[l.z,id,l.type,o]:[l.z,id,l.type]}
+    custom.connections.push(conn);
+  });
+  const linked=form.links.length;
+  form.links=[];["nzName","nzCont","nzAlias","nzLvl","nzNote"].forEach(k=>$(k).value="");
+  saveCustom();renderLinks();
+  msg("zoneMsg",linked?`Added ${name}. You can route to it now.`:`Added ${name}. It has no links yet, so it can only be reached by a teleport you add.`);
+});
+$("nzLinks").addEventListener("change",e=>{const i=e.target.dataset.link;if(i!=null)form.links[+i].type=e.target.value});
+$("nzLinks").addEventListener("click",e=>{const i=e.target.dataset.unlink;if(i!=null){form.links.splice(+i,1);renderLinks()}});
+
+$("connForm").addEventListener("submit",e=>{
+  e.preventDefault();
+  const a=form.ncA,b=form.ncB,typ=$("ncType").value,lvl=+$("ncLvl").value||0,note=$("ncNote").value.trim();
+  if(!a||!b){msg("connMsg","Pick both zones.",true);return}
+  if(a===b){msg("connMsg","Pick two different zones.",true);return}
+  const o={};if(typ==="portal1")o.oneway=true;if(lvl)o.minLevel=lvl;if(note)o.note=note;
+  const t=typ==="portal1"?"portal":typ;
+  custom.connections.push(Object.keys(o).length?[a,b,t,o]:[a,b,t]);
+  form.ncA=form.ncB=null;["ncLvl","ncNote"].forEach(k=>$(k).value="");
+  saveCustom();msg("connMsg",`Linked ${zoneName[a]} and ${zoneName[b]}.`);
+});
+
+$("ntCls").innerHTML=CLASSES.map(c=>`<option${c==="Wizard"?" selected":""}>${c}</option>`).join("");
+$("portForm").addEventListener("submit",e=>{
+  e.preventDefault();
+  const spell=$("ntSpell").value.trim(), dest=form.ntDest, cls=$("ntCls").value, lvl=Math.max(1,Math.min(70,+$("ntLvl").value||1));
+  if(!spell){msg("portMsg","Give the spell a name.",true);$("ntSpell").focus();return}
+  if(!dest){msg("portMsg","Pick where it lands.",true);return}
+  const t={spell,cls,level:lvl,dest,group:$("ntGroup").value==="group"};
+  const reagent=$("ntReagent").value.trim();if(reagent)t.reagent=reagent;
+  if($("ntKind").value==="evac")t.evac=true;
+  const k=portKey(t), wasEditing=portEdit;
+  if(!wasEditing&&data.teleports.some(x=>portKey(x)===k)){msg("portMsg",`${cls} already has a spell named ${spell}. Use its Edit button to change it.`,true);return}
+  if(wasEditing&&wasEditing!==k){
+    if(data.teleports.some(x=>portKey(x)===k)){msg("portMsg",`${cls} already has a spell named ${spell}. Pick a different name.`,true);return}
+    removeTeleport(wasEditing); // renamed or moved to another class: retire the old entry
+  }
+  restoreTeleport(k);
+  const base=DEFAULT_DATA.teleports.find(b=>portKey(b)===k);
+  custom.teleports=custom.teleports.filter(x=>portKey(x)!==k);
+  if(!base||JSON.stringify(base)!==JSON.stringify(t))custom.teleports.push(t); // matching the built-in exactly needs no override
+  portEdit=null;fillPortForm(null);
+  saveCustom();msg("portMsg",wasEditing?`Saved ${spell}.`:`Added ${spell}.`);
+});
+$("portCancel").onclick=()=>{portEdit=null;fillPortForm(null);msg("portMsg","");renderPorts()};
+$("portRows").addEventListener("click",e=>{
+  const b=e.target.closest("button");if(!b)return;
+  const d=b.dataset;
+  if(d.pedit){const t=data.teleports.find(x=>portKey(x)===d.pedit);if(!t)return;portEdit=d.pedit;fillPortForm(t);msg("portMsg","");renderPorts();$("portForm").scrollIntoView({block:"nearest"});$("ntSpell").focus();return}
+  if(d.preset){custom.teleports=custom.teleports.filter(x=>portKey(x)!==d.preset);if(portEdit===d.preset){portEdit=null;fillPortForm(null)}saveCustom();msg("portMsg","Reset to the built-in version.");return}
+  if(d.premove){const t=data.teleports.find(x=>portKey(x)===d.premove);removeTeleport(d.premove);if(portEdit===d.premove){portEdit=null;fillPortForm(null)}saveCustom();
+    msg("portMsg",t&&t.builtin?`Removed ${t.spell}. You can restore it from Removed built-in spells below.`:`Removed ${t?t.spell:"the spell"}.`)}
+});
+$("removedList").addEventListener("click",e=>{const k=e.target.dataset.prestore;if(!k)return;restoreTeleport(k);saveCustom();msg("portMsg","Restored.")});
+$("reagents").addEventListener("change",e=>{const k=e.target.dataset.reagent;if(k==null)return;
+  if(e.target.checked)state.reagents[k]=true;else delete state.reagents[k];refresh()});
+$("reagentTip").addEventListener("click",e=>{const k=e.target.dataset.have;if(k==null)return;state.reagents[k]=true;refresh()});
+document.addEventListener("click",e=>{const g=e.target.closest("[data-goto]");if(g)selectTab(g.dataset.goto)});
+
+$("mine").addEventListener("click",e=>{
+  const kind=e.target.dataset.del;if(!kind)return;
+  const i=+e.target.dataset.i;
+  if(kind==="zones"){
+    const id=custom.zones[i][0];custom.zones.splice(i,1);
+    if(!DEFAULT_DATA.zones.some(b=>b[0]===id)){
+      custom.connections=custom.connections.filter(x=>x[0]!==id&&x[1]!==id);
+      custom.teleports=custom.teleports.filter(t=>t.dest!==id);
+      delete custom.notes[id];
+      Object.keys(custom.directions).forEach(k=>{if(k.split(">").includes(id))delete custom.directions[k]});
+    }
+  }else custom[kind].splice(i,1);
+  saveCustom();
+});
+
+function showData(){if(document.activeElement!==$("dataText"))$("dataText").value=JSON.stringify(custom,null,1)}
+$("saveData").onclick=()=>{
+  try{
+    const raw=JSON.parse($("dataText").value);
+    const c=normalizeCustom(raw);
+    const ids=new Set([...DEFAULT_DATA.zones.map(z=>z[0]),...c.zones.map(z=>z[0])]);
+    const badC=c.connections.find(x=>!ids.has(x[0])||!ids.has(x[1]));
+    if(badC)throw new Error(`The link ${badC[0]} ↔ ${badC[1]} uses a zone id that isn't on the map.`);
+    const badT=c.teleports.find(t=>!ids.has(t.dest));
+    if(badT)throw new Error(`${badT.spell} lands in "${badT.dest}", which isn't on the map.`);
+    custom=c;saveCustom();$("dataText").value=JSON.stringify(custom,null,1);$("dataMsg").textContent="Saved.";
+  }catch(err){$("dataMsg").innerHTML=`<span class="warn">Not saved: ${esc(err.message)}</span>`}
+};
+$("copyData").onclick=()=>{
+  const ta=$("dataText");
+  navigator.clipboard.writeText(ta.value).then(()=>{$("dataMsg").textContent="Copied."},()=>{ta.focus();ta.select();$("dataMsg").textContent="Selected. Press Ctrl+C to copy."});
+};
+let resetArmed=null;
+$("resetData").onclick=e=>{
+  const b=e.currentTarget;
+  if(!resetArmed){b.textContent="Click again to remove every zone, link, teleport, note and direction you added";resetArmed=setTimeout(()=>{resetArmed=null;b.textContent="Remove all my additions"},4000);return}
+  clearTimeout(resetArmed);resetArmed=null;b.textContent="Remove all my additions";
+  custom=clone(EMPTY_CUSTOM);saveCustom();$("dataText").value=JSON.stringify(custom,null,1);$("dataMsg").textContent="Your additions were removed.";
+};
+
+/* ---------- Refresh ---------- */
+function refresh(save=true){
+  if(save)persist("state");
+  Object.values(combos).forEach(c=>c.sync());
+  renderStars();renderFavs();renderCasters();renderReagents();renderRoute(true);renderPorts();renderMine();
+  if(!$("guide").contains(document.activeElement))renderGuide();
+  ["zone","boat","port"].forEach(k=>{const el=$("w"+k[0].toUpperCase()+k.slice(1));if(document.activeElement!==el)el.value=state.w[k]});
+}
+
+function toggleFav(z){
+  const i=state.favs.findIndex(f=>f.z===z);
+  if(i>=0)state.favs.splice(i,1);else state.favs.push({z,note:""});
+  refresh();
+}
+
+/* ---------- Wire up ---------- */
+rebuild();
+["from","to","bind"].forEach(k=>{
+  makeCombo(k,{value:()=>state[k],onPick:z=>{state[k]=z;refresh()}});
+  $(k+"-star").onclick=()=>toggleFav(state[k]);
+});
+makeCombo("favAdd",{value:()=>null,keepText:false,onPick:z=>{if(!isFav(z)){state.favs.push({z,note:""});refresh()}}});
+makeCombo("nzLink",{value:()=>null,keepText:false,onPick:z=>{if(!form.links.some(l=>l.z===z))form.links.push({z,type:"zone"});renderLinks()}});
+["ncA","ncB","ntDest"].forEach(k=>makeCombo(k,{value:()=>form[k],onPick:z=>{form[k]=z}}));
+
+$("swap").onclick=()=>{[state.from,state.to]=[state.to,state.from];refresh()};
+$("casters").addEventListener("change",e=>{const i=e.target.dataset.i,k=e.target.dataset.k;if(i==null)return;
+  state.casters[i][k]=k==="level"?Math.max(1,Math.min(70,+e.target.value||1)):e.target.value;refresh()});
+$("casters").addEventListener("click",e=>{const i=e.target.dataset.rm;if(i==null)return;state.casters.splice(+i,1);refresh()});
+$("addMe").onclick=()=>{state.casters.push({who:"me",cls:"Cleric",level:1});refresh()};
+$("addFriend").onclick=()=>{state.casters.push({who:"friend",cls:"Druid",level:29});refresh()};
+[["wZone","zone"],["wBoat","boat"],["wPort","port"]].forEach(([id,k])=>{
+  $(id).addEventListener("input",e=>{const v=parseFloat(e.target.value);if(v>0){state.w[k]=v;refresh()}})});
+
+$("favs").addEventListener("click",e=>{
+  const b=e.target.closest("[data-act]");if(!b)return;
+  const f=state.favs[+b.dataset.i];if(!f)return;
+  if(b.dataset.act==="rm")state.favs.splice(+b.dataset.i,1);
+  else state[b.dataset.act]=f.z;
+  refresh();
+});
+$("favs").addEventListener("input",e=>{
+  const z=e.target.dataset.note;if(z==null)return;
+  setNote(z,e.target.value);
+});
+$("favs").addEventListener("focusout",e=>{if(e.target.dataset.note!=null){renderRoute();if(guide.zone===e.target.dataset.note)renderGuide()}});
+
+let clearArmed=null;
+$("clearSaved").onclick=e=>{
+  const b=e.currentTarget;
+  if(!clearArmed){b.textContent="Click again to clear classes, bind point and favorites";clearArmed=setTimeout(()=>{clearArmed=null;b.textContent="Clear saved settings"},4000);return}
+  clearTimeout(clearArmed);clearArmed=null;b.textContent="Clear saved settings";
+  state=clone(DEFAULT_STATE);lsDel(":state");rebuild();refresh();
+};
+
+document.querySelectorAll(".tab").forEach(t=>t.onclick=()=>{
+  if(t.dataset.tab==="guide")renderGuide();
+  if(t.dataset.tab==="route")renderRoute();
+  selectTab(t.dataset.tab);
+});
+makeCombo("guideZone",{value:()=>guide.zone,onPick:z=>{guide.zone=z;renderGuide()}});
+$("route").addEventListener("focusout",e=>{if(e.target.matches("textarea"))renderFavs()});
+
+renderLinks();refresh(false);
+initCloud();
+</script>
+
+</body></html>
